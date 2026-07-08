@@ -1,0 +1,165 @@
+[project]
+name = "agentsla"
+version = "0.1.0.dev0"
+description = "SLO-aware reliability runtime for tool-calling LLM agents."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+authors = [
+  { name = "AgentSLA contributors" },
+]
+keywords = ["agent", "reliability", "replay", "verification", "policy", "llm", "sla"]
+
+# Phase 1 core dependencies (pinned per .planning/research/STACK.md 2026-07-08).
+# Claude SDK / LangGraph / prometheus_client / Typer installed via optional extras
+# (see [project.optional-dependencies] below) — Phase 2/4/5 surface them.
+dependencies = [
+  "pydantic==2.13.4",
+  "duckdb==1.5.4",
+  "pyarrow==24.0.0",
+  "structlog==26.1.0",
+]
+
+[project.optional-dependencies]
+# Phase 2: Claude Agent SDK adapter and LangGraph adapter live behind extras so the
+# core install stays small and the framework-specific deps surface only on demand.
+claude = [
+  "claude-agent-sdk==0.2.114",
+]
+langgraph = [
+  "langgraph==1.2.8",
+]
+# Phase 4: Prometheus exporter + Grafana dashboard plumbing.
+metrics = [
+  "prometheus-client==0.25.0",
+]
+# Phase 5: Benchmark harness + report generation + CLI surface.
+bench = [
+  "typer==0.26.8",
+  "rich==15.0.0",
+]
+# Test-only dependencies. Kept separate from [project.dependencies] so `pip install agentsla`
+# does not pull pytest/hypothesis into runtime installs.
+test = [
+  "pytest==9.1.1",
+  "pytest-asyncio==1.4.0",
+  "pytest-cov==7.1.0",
+  "hypothesis==6.156.4",
+]
+
+# `agentsla[all]` pulls every adapter + the bench surface — convenient for the
+# one-command repo repro target (`uv sync --extra all`) while staying optional.
+all = [
+  "agentsla[claude,langgraph,metrics,bench,test]",
+]
+
+[project.scripts]
+agentsla = "agentsla.cli:app"
+
+[project.urls]
+Repository = "https://github.com/anthropic-research/agentsla"
+Issues = "https://github.com/anthropic-research/agentsla/issues"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agentsla"]
+
+# ---------------------------------------------------------------------------
+# Tooling
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+# Project lint policy (LINT-01): zero findings on `ruff check`, zero diffs on
+# `ruff format --check`. Pinned config; bump versions in lock only.
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+  "build",
+  "dist",
+  ".venv",
+  ".planning",
+  "**/node_modules",
+]
+
+[tool.ruff.lint]
+# Strict default; per-file ignores added only where third-party stubs force it.
+select = [
+  "E",   # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "F",   # pyflakes
+  "I",   # isort
+  "B",   # bugbear
+  "UP",  # pyupgrade
+  "S",   # bandit (security)
+  "RUF", # ruff-specific
+]
+ignore = [
+  "S101",  # `assert` is fine in tests; bandit's blind spot there
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+"bench/**" = ["T201"]  # print() is allowed in bench harness output
+
+[tool.ruff.lint.isort]
+known-first-party = ["agentsla"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+# TYPING-01: `mypy --strict` on `agentsla/core/`, `agentsla/policy/`, `agentsla/verify/`.
+# Coverage of the whole tree is enforced in CI; per-package overrides narrow where needed.
+python_version = "3.11"
+strict = true
+warn_unused_configs = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+disallow_untyped_defs = true
+# Pydantic v2 ships type stubs via the runtime package; we don't install
+# `types-*` for the runtime deps that already type their own surface.
+ignore_missing_imports = false
+
+[[tool.mypy.overrides]]
+module = "hypothesis.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+# Tests can be looser; production code stays strict.
+check_untyped_defs = false
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = [
+  "-ra",
+  "--strict-markers",
+  "--strict-config",
+]
+markers = [
+  "property: property-based tests driven by hypothesis",
+  "integration: tests that need filesystem or process isolation",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["agentsla/core", "agentsla/policy", "agentsla/verify"]
+
+[tool.coverage.report]
+# COVERAGE-01 floor: enforce 85% line coverage on the three target modules.
+# CI fails if a phase finishes below its floor.
+exclude_lines = [
+  "pragma: no cover",
+  "raise NotImplementedError",
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+]
+show_missing = true
+skip_covered = false
+fail_under = 85
