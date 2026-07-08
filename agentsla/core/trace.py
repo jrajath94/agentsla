@@ -178,6 +178,16 @@ class TraceWriter:
         )
         self._maybe_rotate()
 
+    def next_seq(self, trace_id: UUID) -> int:
+        """Return ``max(seq) + 1`` for ``trace_id`` (0 when no rows yet)."""
+        if self._con is None:
+            raise RuntimeError("TraceWriter is closed")
+        row = self._con.execute(
+            "SELECT COALESCE(MAX(seq), -1) + 1 AS next FROM events WHERE trace_id = ?",
+            (str(trace_id),),
+        ).fetchone()
+        return int(row[0]) if row else 0
+
     # ----- exports -----
 
     def export_parquet(self, out_path: Path, *, mode: Literal["write", "append"] = "write") -> None:
