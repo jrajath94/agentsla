@@ -310,18 +310,31 @@ class TraceReader:
         """Reconstruct the full Trace for ``trace_id``.
 
         Returns ``None`` when the trace id is unknown (not an error). The
-        task_id + model_id fields default to empty strings until the bench
-        harness (Phase 5) starts emitting them as part of the trace metadata.
+        ``task_id`` field defaults to an empty string; ``model_id`` falls
+        back to the first observed :class:`ModelMessage`'s model_id, or the
+        placeholder ``"unknown"`` if no model messages were recorded.
+
+        Phase 1 emits no top-level trace metadata table; the bench harness
+        (Phase 5) will start populating ``task_id`` properly.
         """
         events = list(self.iter_events(trace_id))
         if not events:
             return None
         first = events[0]
         last = events[-1]
+        # Pick the recorded model_id from the first ModelMessage when present;
+        # otherwise fall back to a sentinel that satisfies the TypeIdStr
+        # min_length=1 constraint.
+        model_id = "unknown"
+        for ev in events:
+            mid = getattr(ev, "model_id", None)
+            if isinstance(mid, str) and mid:
+                model_id = mid
+                break
         return Trace(
             trace_id=trace_id,
             task_id="",
-            model_id=getattr(first, "model_id", "") or "",
+            model_id=model_id,
             events=events,
             final_answer="",
             start_ts=first.ts,
