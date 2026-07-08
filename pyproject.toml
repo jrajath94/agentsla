@@ -120,12 +120,20 @@ warn_redundant_casts = true
 no_implicit_optional = true
 check_untyped_defs = true
 disallow_untyped_defs = true
-# Pydantic v2 ships type stubs via the runtime package; we don't install
-# `types-*` for the runtime deps that already type their own surface.
-ignore_missing_imports = false
+# duckdb and pyarrow.parquet do not ship Python type stubs in their
+# current versions; this is the documented escape hatch.
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "hypothesis.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "duckdb"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pyarrow.parquet"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
