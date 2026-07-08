@@ -144,7 +144,7 @@ class ReplayEngine:
         silently recorded.
         """
         normalized_mode: Literal["strict", "tolerant"] = (
-            mode.value if isinstance(mode, ReplayMode) else mode  # type: ignore[assignment]
+            mode.value if isinstance(mode, ReplayMode) else mode
         )
 
         with TraceReader(self.db_path) as reader:

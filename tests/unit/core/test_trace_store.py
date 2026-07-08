@@ -134,7 +134,7 @@ def test_append_rejects_duplicates_via_pk(tmp_path: Path) -> None:
 
 
 def test_export_parquet_writes_valid_parquet(tmp_path: Path) -> None:
-    writer, events = _seed_writer(tmp_path)
+    writer, _events = _seed_writer(tmp_path)
     writer.close()
 
     out = tmp_path / "out.parquet"

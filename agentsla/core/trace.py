@@ -31,7 +31,7 @@ Per-run rotation (PITFALL #11 — DuckDB file growth) is plumbed through
 ``TraceWriter(db_path, rotate_after_bytes=...)``: when the file exceeds the
 threshold, the writer closes the current connection, renames the file to
 ``<path>.rotated-<ts>``, and opens a fresh file. Default is 50 MiB which fits
-the bench harness (30 tasks × 5 seeds × 2 modes ≈ 300 short traces) comfortably.
+the bench harness (30 tasks x 5 seeds x 2 modes ≈ 300 short traces) comfortably.
 
 Q3 mitigation: the reader always opens ``read_only=True``; the writer's
 read-write connection serializes only when needed. Concurrent writers are
@@ -122,7 +122,10 @@ class TraceWriter:
         # Close + rename + reopen.
         assert self._con is not None
         self._con.close()
-        target = self.db_path.with_name(f"{self.db_path.name}.rotated-{int(self.db_path.stat().st_mtime)}")
+        rotation_stamp = int(self.db_path.stat().st_mtime)
+        target = self.db_path.with_name(
+            f"{self.db_path.name}.rotated-{rotation_stamp}"
+        )
         shutil.move(str(self.db_path), str(target))
         self._open()
 
@@ -187,8 +190,9 @@ class TraceWriter:
             raise RuntimeError("TraceWriter is closed")
         out_path = Path(out_path)
         out_path.parent.mkdir(parents=True, exist_ok=True)
+        append_clause = ' ,APPEND' if mode == 'append' else ''
         self._con.execute(
-            f"COPY events TO '{out_path.as_posix()}' (FORMAT PARQUET{' ,APPEND' if mode == 'append' else ''})"
+            f"COPY events TO '{out_path.as_posix()}' (FORMAT PARQUET{append_clause})"
         )
 
     # ----- accessors used by the bench CLI -----
