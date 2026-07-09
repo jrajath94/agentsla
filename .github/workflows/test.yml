@@ -130,3 +130,18 @@ jobs:
         run: |
           uv run python -m agentsla report --out bench/results/REPORT.md
           grep -q "Seeded-error experiment" bench/results/REPORT.md
+
+      # 4. Integration gate (EXECUTION.md Commit 7): grep-level check
+      # that bench/harness.py wires the four components together. Defends
+      # against future refactors that silently drop PolicyGate, Classifier,
+      # JsonlLabelSink, or build_metrics from the WrappedHooks pipeline.
+      - name: Integration gate — bench wiring symbols
+        run: |
+          set -euo pipefail
+          for sym in PolicyGate Classifier JsonlLabelSink build_metrics; do
+            if ! grep -q "$sym" agentsla/bench/harness.py; then
+              echo "::error file=agentsla/bench/harness.py::missing required symbol $sym"
+              exit 1
+            fi
+          done
+          echo "bench wiring symbols OK"
