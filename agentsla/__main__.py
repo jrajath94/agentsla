@@ -3,12 +3,15 @@
 Usage:
     python -m agentsla run [--db PATH] [--text TASK]
     python -m agentsla replay TRACE_ID [--db PATH] [--mode strict|tolerant]
+    python -m agentsla bench [--all] [--seeds N] [--out PATH]
+    python -m agentsla report [--in PATH] [--out PATH]
 """
 
 from __future__ import annotations
 
 import sys
 
+from agentsla.bench import bench_main, report_main
 from agentsla.cli import replay as replay_mod
 from agentsla.cli import run as run_mod
 
@@ -17,13 +20,20 @@ def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
     if not argv:
-        print("usage: agentsla {run,replay} ...", file=sys.stderr)
+        print(
+            "usage: agentsla {run,replay,bench,report} ...",
+            file=sys.stderr,
+        )
         return 1
     cmd, *rest = argv
     if cmd == "run":
         return run_mod.main(rest)
     if cmd == "replay":
         return replay_mod.main(rest)
+    if cmd == "bench":
+        return bench_main(rest)
+    if cmd == "report":
+        return report_main(rest)
     print(f"unknown subcommand: {cmd!r}", file=sys.stderr)
     return 1
 

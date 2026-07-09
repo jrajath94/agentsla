@@ -18,8 +18,8 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from agentsla.verify.base import ClaimVerdict, Verifier
 from agentsla.verify.claims import NumericClaim, extract_numeric_claims
-from agentsla.verify import ClaimVerdict, Verifier
 
 
 # Default relative tolerance for float comparison.
