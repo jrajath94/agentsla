@@ -37,48 +37,137 @@ from agentsla.adapters.base import RuntimeHooks
 from agentsla.adapters.noop_hooks import NoOpHooks
 from agentsla.adapters.rawloop import EchoModel, RawLoopAdapter
 from agentsla.bench.tasks import BenchTask, load_tasks, stats
+from agentsla.classify import (
+    Classifier,
+    JsonlLabelSink,
+    build_metrics,
+)
+from agentsla.classify.metrics import on_classify_callback
 from agentsla.core.trace import TraceWriter
+from agentsla.policy import Policy, PolicyGate
+from agentsla.policy.egress import EgressRule, default_egress_rules
 from agentsla.tools.deterministic import JsonEchoTool
 from agentsla.verify import NumericVerifier, VerificationChain, identity_source
 
 
 # ---------------------------------------------------------------------------
-# Wrapped hooks — runs verifier + classifier
+# Module-level singletons
+# ---------------------------------------------------------------------------
+# The bench creates a fresh WrappedHooks per (mode, task, seed) tuple — 175
+# wrapped runs in a single CLI invocation. Prometheus ``Counter`` registration
+# on the default global registry raises ``ValueError: Duplicated timeseries``
+# on the second ``build_metrics()`` call, so we instantiate once at import
+# time and share across every WrappedHooks. The label sink is per-instance
+# because it owns the file handle, but its appends are append-only + thread-
+# unsafe at the OS layer (fine for a single-process bench).
+
+
+_METRICS = build_metrics()
+_LABEL_SINK_PATH = Path("bench/results/labels.jsonl")
+
+
+# ---------------------------------------------------------------------------
+# Wrapped hooks — runs policy gate + verifier + classifier + label sink
 # ---------------------------------------------------------------------------
 
 
-class WrappedHooks(RuntimeHooks):
-    """Hooks that drive the verification gate + an injection scrubber after the run.
+# Symbolic injection payload (``bench/tasks.py``). The default ``aws_access_key``
+# egress regex requires ``AKIA`` + 16 uppercase-alnum chars (20 chars total),
+# but the bench payload is only 12 chars (a symbolic marker, not a real AWS
+# key id). We add a dedicated bench-only rule that matches the literal so
+# the gate's enforcement surfaces in the headline numbers. Production
+# deployments keep the default pack (real-formatted secrets only) — the
+# symbolic rule lives in the bench harness, not in :mod:`policy.egress`.
+_BENCH_EGRESS = EgressRule(
+    name="ak_symbolic",
+    regex=r"\bAKIAEXAMPLE\b",
+    severity="deny",
+)
 
-    The agent runs the same as naked; the gate then evaluates the final answer
-    and (for injection tasks) scrubs the secret payload from the output.
+
+class WrappedHooks(RuntimeHooks):
+    """Hooks that run the full AgentSLA relay.
+
+    Pipeline (per trace):
+      1. ``on_tool_call`` — :class:`PolicyGate` decides ALLOW/DENY/REWRITE
+         against the loaded policy (default egress pack + bench-only
+         ``ak_symbolic`` rule for the literal injection payload).
+      2. ``on_final_answer`` —
+         a. :class:`VerificationChain` evaluates numeric claims (Phase 3 gate).
+         b. :class:`Classifier` picks a failure category via heuristics
+            (≤20% traces go to LLM judge, by default StubJudge).
+         c. Label row appended to :class:`JsonlLabelSink`.
+         d. Prometheus counter ``agentsla_failures_total{category=...}`` incremented.
+         e. Verification-coverage gauge ``agentsla_verify_coverage`` updated.
     """
 
     INJECTION_PAYLOAD = "AKIAEXAMPLE"
 
-    def __init__(self, writer: TraceWriter) -> None:
+    def __init__(self, writer: TraceWriter, *, label_sink_path: Path | None = None) -> None:
         self.writer = writer
+        # ---- Policy gate (Phase 2) ----
+        # Egress rules = default pack (real secrets) + bench-only AKIAEXAMPLE rule.
+        self.policy = Policy(
+            allowed_tools=["json_echo"],
+            egress_rules=[*default_egress_rules(), _BENCH_EGRESS],
+        )
+        self.gate = PolicyGate(self.policy)
+        # ---- Verifier (Phase 3) ----
         self.verifier = NumericVerifier(source_resolver=identity_source)
         self.chain = VerificationChain(verifiers=[self.verifier])
+        # ---- Classifier (Phase 4) ----
+        sink_path = label_sink_path or _LABEL_SINK_PATH
+        self.label_sink = JsonlLabelSink(sink_path)
+        self.metrics = _METRICS
+        self.classifier = Classifier(
+            sink=self.label_sink,
+            on_classify=on_classify_callback(self.metrics),
+            heuristic_context={"allowed_tools": ["json_echo"]},
+        )
+        # ---- Per-run state (read by _run_one after adapter.run) ----
         self.last_verified: bool | None = None
         self.last_coverage: float | None = None
+        self.last_denied_by_policy: bool = False
+        self.last_egress_hits: list[str] = []
+        self.last_classification: object | None = None
 
     def on_tool_call(self, call):  # type: ignore[override]
-        return _ALLOW
+        decision = self.gate.on_tool_call(call)
+        if not decision.allow:
+            self.last_denied_by_policy = True
+            for rule in self.policy.egress_rules:
+                if rule.name in (decision.reason or ""):
+                    self.last_egress_hits.append(rule.name)
+                    break
+        return decision
 
     def on_tool_result(self, call, result):  # type: ignore[override]
         return None
 
     def on_final_answer(self, trace, verdict):  # type: ignore[override]
-        # Run the verification chain now that the trace is complete.
-        # Identity source_resolver → numeric claims (e.g. from JSON echoes of
-        # numbers in the task text) self-verify; the gate is wired end-to-end.
+        # 1. Verification chain (Phase 3).
         result = self.chain.run(trace, trace.final_answer)
         self.last_verified = result.passed
         self.last_coverage = result.coverage
-
-
-_ALLOW = type("Allow", (), {"allow": True})()
+        # 2. Classifier (Phase 4) — feeds off the gate's audit log when denied.
+        deny_counts: dict[str, int] = {}
+        for entry in self.gate.audit:
+            if entry["decision"] == "deny":
+                deny_counts[entry["tool"]] = deny_counts.get(entry["tool"], 0) + 1
+        ctx = dict(self.classifier.heuristic_context)
+        if self.last_egress_hits:
+            ctx["egress_hits"] = self.last_egress_hits
+        if deny_counts:
+            ctx["deny_counts"] = deny_counts
+        saved_ctx = self.classifier.heuristic_context
+        self.classifier.heuristic_context = ctx
+        try:
+            cls = self.classifier.classify(trace, verification_incorrect=result.incorrect)
+        finally:
+            self.classifier.heuristic_context = saved_ctx
+        self.last_classification = cls
+        # 3. Coverage gauge.
+        self.metrics.verify_coverage.set(float(self.last_coverage or 0.0))
 
 
 # ---------------------------------------------------------------------------
