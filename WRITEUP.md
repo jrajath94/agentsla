@@ -263,6 +263,16 @@ domain knowledge: "this claim is the sum of column X in tool result
 Y, recompute as `sum(result.y)` and tolerance-check against 1e-6
 relative".
 
+**Tolerance is per-verifier, not global.** Each
+`NumericVerifier(tolerance=...)` instance carries its own threshold;
+the `VerificationChain` runs verifiers in declared order and
+aggregates per-claim verdicts. The shipped default is `1e-6` (relative
+against `max(|observed|, |expected|, 1e-12)`). Financial-ops
+deployments should use `1e-9` to catch rounding drift in P&L sums;
+doc-QA can loosen to `1e-3` because prose answers rarely match a
+tool result to more than three significant figures. The right value
+is domain-specific; the API does not assume one fits all.
+
 ## What the LLM judge actually sees
 
 The judge prompt template is committed to `agentsla/classify/judge.py`

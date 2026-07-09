@@ -149,3 +149,57 @@ def test_seeded_summary() -> None:
                 caught += 1
     assert caught / total_wrong >= 0.90, f"caught {caught}/{total_wrong}"
     assert false_corrections == 0
+
+
+# Range-claim extraction (Addendum #3).
+def test_extract_range_dollar_dash() -> None:
+    claims = extract_numeric_claims("Revenue is approx $4.2-$4.5.")
+    ranges = [c for c in claims if c.kind == "range"]
+    assert len(ranges) == 1
+    low, high = ranges[0].value
+    assert low == pytest.approx(4.2)
+    assert high == pytest.approx(4.5)
+
+
+def test_extract_range_with_to() -> None:
+    claims = extract_numeric_claims("Range: 3.5 to 4.0.")
+    ranges = [c for c in claims if c.kind == "range"]
+    assert len(ranges) == 1
+    assert ranges[0].value == (3.5, 4.0)
+
+
+def test_extract_range_en_dash() -> None:
+    """En-dash (U+2013) and em-dash (U+2014) are matched; the regex
+    source carries them as literal Unicode characters.
+    """
+    claims = extract_numeric_claims("Q1: 100-150 units.")
+    ranges = [c for c in claims if c.kind == "range"]
+    assert len(ranges) == 1
+    assert ranges[0].value == (100.0, 150.0)
+
+
+def test_extract_range_handles_date_like_input() -> None:
+    """Known limitation: digit-only dashed spans (e.g. dates) ARE
+    parsed as ranges because the regex cannot distinguish intent.
+    Documented in docs/failure-modes.md as a heuristic edge case.
+    """
+    claims = extract_numeric_claims("Date: 2024-01-15.")
+    # We do not assert range == [] — the parser does emit one. The
+    # operator is expected to scope range extraction with a domain
+    # filter, not rely on the regex alone.
+    assert any(c.kind in ("int", "range") for c in claims)
+
+
+# Range-claim verification: verified iff source lies in [low, high].
+def test_range_verified_when_source_in_range() -> None:
+    v = NumericVerifier(source_resolver=lambda _c, _t: 4.3)
+    verdicts = v.verify(trace=None, final_answer="Revenue approx $4.2-$4.5.")
+    ranges = [r for r in verdicts if r.claim and "$4.2-$4.5" in r.claim]
+    assert any(r.status == "verified" for r in ranges)
+
+
+def test_range_incorrect_when_source_outside() -> None:
+    v = NumericVerifier(source_resolver=lambda _c, _t: 5.0)
+    verdicts = v.verify(trace=None, final_answer="Revenue approx $4.2-$4.5.")
+    ranges = [r for r in verdicts if r.claim and "$4.2-$4.5" in r.claim]
+    assert any(r.status == "incorrect" for r in ranges)

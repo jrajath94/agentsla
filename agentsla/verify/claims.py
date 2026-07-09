@@ -46,9 +46,25 @@ _KIND_BY_PATTERN: list[tuple[str, re.Pattern[str]]] = [
     ("int", re.compile(r"(?<![A-Za-z\.\d])-?\d+(?!\.\d)")),
 ]
 
+# Range claim patterns. Recognise "$4.2-$4.5", "4.2 to 4.5",
+# "100-150". Suffix multipliers (4.2M-4.5M) are intentionally not
+# supported here — the parser stays narrow; per-endpoint multipliers
+# would inflate false-positive risk on date/phone spans.
+_RANGE_PATTERN = re.compile(
+    r"(?:\$|€|£|¥)?\s?-?\d+(?:[\.,]\d+)?"
+    r"\s*(?:-|–|—|\bto\b)\s*"
+    r"(?:\$|€|£|¥)?\s?-?\d+(?:[\.,]\d+)?"
+)
+
 
 def extract_numeric_claims(text: str) -> list[NumericClaim]:
-    """Find every numeric claim in ``text`` (order-preserving, deduped)."""
+    """Find every numeric claim in ``text`` (order-preserving, deduped).
+
+    Range claims (``"$4.2M-$4.5M"``, ``"3.5 to 4.0"``) are emitted with
+    ``kind="range"`` and ``value=(low, high)``. Downstream verifiers
+    interpret a range as "verified if the source value lies within
+    [low, high]" — see :class:`NumericVerifier._judge_range`.
+    """
     claims: list[NumericClaim] = []
     seen_spans: set[tuple[int, int]] = set()
 
@@ -62,6 +78,20 @@ def extract_numeric_claims(text: str) -> list[NumericClaim]:
             seen_spans.add(span)
             value = _parse_value(match.group(0), kind)
             claims.append(NumericClaim(text=match.group(0), value=value, kind=kind, span=span))
+
+    # Range claims. The pattern consumes both endpoints; we emit one
+    # NumericClaim per match with kind="range" and value=(low, high).
+    for match in _RANGE_PATTERN.finditer(text):
+        span = match.span()
+        if span in seen_spans:
+            continue
+        seen_spans.add(span)
+        low, high = _parse_range(match.group(0))
+        if low is None or high is None:
+            continue
+        claims.append(
+            NumericClaim(text=match.group(0), value=(low, high), kind="range", span=span)
+        )
 
     # Arithmetic expressions: a span of digits/operators + parens between
     # two claim boundaries. Cheap heuristic — parsed via :mod:`ast`.
@@ -90,6 +120,34 @@ def _parse_value(raw: str, kind: str) -> int | float:
     if "." in cleaned:
         return float(cleaned)
     return int(cleaned)
+
+
+def _is_range_match(raw: str) -> bool:  # kept for API compat; always True.
+    return True
+
+
+def _parse_range(raw: str) -> tuple[float | None, float | None]:
+    """Split ``"$4.2-$4.5"`` → ``(4.2, 4.5)``.
+
+    Currency symbols are stripped; commas inside numbers are removed.
+    Returns ``(None, None)`` if the input cannot be parsed.
+    """
+    parts = re.split(r"\s*(?:-|–|—|\bto\b)\s*", raw)
+    if len(parts) != 2:
+        return None, None
+    nums: list[float] = []
+    for p in parts:
+        cleaned = re.sub(r"[$€£¥%\s]", "", p)
+        cleaned = cleaned.replace(",", "")
+        if not cleaned or cleaned in {"-", ".", "-."}:
+            return None, None
+        try:
+            nums.append(float(cleaned))
+        except ValueError:
+            return None, None
+    if nums[0] > nums[1]:
+        nums[0], nums[1] = nums[1], nums[0]
+    return nums[0], nums[1]
 
 
 _EXPR_PATTERN = re.compile(

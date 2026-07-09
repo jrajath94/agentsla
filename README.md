@@ -32,11 +32,27 @@ Request
 
 ## Installation
 
+Requires **Python 3.11+** (`datetime.UTC` is used in the core event
+types; 3.10 and below fail at import time).
+
 ```bash
 pip install agentsla
 
 # Or with all optional adapters
 pip install "agentsla[all]"
+```
+
+If your system Python is older than 3.11, use a venv or `uv`:
+
+```bash
+# uv (recommended)
+uv sync --extra all
+uv run python -m pytest            # always uses the venv's interpreter
+
+# venv
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[all]"
 ```
 
 ## Quick Start
@@ -120,6 +136,14 @@ agentsla bench --all
 
 Runs 30 tasks (10 financial ops, 10 incident triage, 10 doc QA) with wrapped and unwrapped agents. Outputs TTFT latency overhead, cost overhead, and verification recovery rate.
 
+```bash
+# Optional: expose Prometheus counters via HTTP for live Grafana dashboards
+agentsla bench --all --metrics-port 9090
+# Then add 127.0.0.1:9090 as a scrape target in Prometheus.
+```
+
+The seeded-error experiment (`agentsla bench-seeded-errors`) is a separate command that validates the verification gate's catch-rate on synthetic perturbed numeric outputs. See `REPORT.md § "Seeded-error experiment"` after running it.
+
 ## Design Notes
 
 **Verification Coverage as a First-Class Metric**: "Verified" is meaningless without knowing how much of the response was actually checked. AgentSLA emits coverage_pct alongside every verdict.
@@ -133,6 +157,9 @@ Runs 30 tasks (10 financial ops, 10 incident triage, 10 doc QA) with wrapped and
 - Verification handles numeric claims. Qualitative judgments (e.g., "sentiment is positive") require an external LLM check.
 - Deterministic replay requires deterministic tool responses. Non-deterministic services (live APIs) will show divergence under replay.
 - Policy gate runs only on declared tool calls. If an agent generates code that makes external requests outside the declared tools, this layer cannot intercept.
+- Classifier uses `StubJudge` by default — the LLM-judge stage never runs in hermetic mode. Production deployments must instantiate `Classifier(judge=ClaudeJudge())` (haiku 4.5, `$ANTHROPIC_API_KEY` required) to exercise the full two-stage pipeline.
+- Prometheus counters are in-process. The shipped bench writes to the default registry but does NOT start a `/metrics` HTTP server unless `--metrics-port N` is passed. The Grafana dashboard JSON expects live series; locally, run `python -m agentsla bench --metrics-port 9090` and add a scrape target.
+- Numeric range claims (e.g. "$4.2M-$4.5M") are parsed by the regex extractor only when the suffix multiplier is on the whole span; per-endpoint multipliers ("$4.2M-$4.5M") are not currently supported. See `docs/failure-modes.md § 6` for the regex's documented limitations.
 
 ## References
 

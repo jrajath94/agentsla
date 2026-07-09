@@ -68,6 +68,21 @@ class NumericVerifier:
             return ClaimVerdict(
                 claim=claim.text, status="unverified", observed=claim.value, expected=None
             )
+        # Range claims: ``verified`` iff ``source`` lies inside the
+        # claimed interval (inclusive). Otherwise ``incorrect``.
+        if claim.kind == "range" and isinstance(claim.value, tuple) and len(claim.value) == 2:
+            low, high = claim.value
+            try:
+                inside = low <= float(source) <= high
+            except (TypeError, ValueError):
+                inside = False
+            return ClaimVerdict(
+                claim=claim.text,
+                status="verified" if inside else "incorrect",
+                observed=claim.value,
+                expected=source,
+                confidence=1.0,
+            )
         if self._values_match(claim.value, source):
             return ClaimVerdict(
                 claim=claim.text,

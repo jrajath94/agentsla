@@ -294,7 +294,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--db", type=Path, default=Path(".agentsla/bench.duckdb"), help="Trace-store DuckDB path.")
     parser.add_argument("--seeds", type=int, default=5, help="Number of seeds per (mode, task).")
     parser.add_argument("--include-injection", action="store_true", default=True, help="Include injection-attack variants (default True).")
+    parser.add_argument("--metrics-port", type=int, default=None, help="If set, start a Prometheus /metrics HTTP server on this port before running the bench. Closes the gap between the shipped Grafana dashboard JSON (which expects live series) and the bench's in-memory counters.")
     args = parser.parse_args(argv)
+
+    metrics_server = None
+    if args.metrics_port is not None:
+        try:
+            from prometheus_client import start_http_server
+
+            metrics_server = start_http_server(args.metrics_port)
+            print(f"Prometheus /metrics serving on :{args.metrics_port}")
+        except ImportError as exc:  # pragma: no cover — optional dep
+            print(
+                f"WARNING: --metrics-port requested but prometheus_client not available ({exc}); skipping",
+                file=sys.stderr,
+            )
 
     tasks = load_tasks(include_injection=args.include_injection)
     s = stats(tasks)
