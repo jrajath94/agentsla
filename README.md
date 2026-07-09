@@ -148,6 +148,8 @@ The seeded-error experiment (`agentsla bench-seeded-errors`) is a separate comma
 
 **Verification Coverage as a First-Class Metric**: "Verified" is meaningless without knowing how much of the response was actually checked. AgentSLA emits coverage_pct alongside every verdict.
 
+**Honest Headline Metric**: The bench reports `gate_passed` (fraction of runs where the gate ran without rejecting) and `verified_at_truth` (fraction of gate-passed runs that also match a canonical answer, when ground truth is declared). The earlier `verified_pct` column conflated "the gate ran" with "the claims are true"; the new columns separate the two. See [WRITEUP.md](WRITEUP.md) for the full framing and `docs/comparative-analysis.md` for how AgentSLA's metrics stack up against LangSmith / Langfuse / Helicone / Braintrust.
+
 **Append-Only Trace Log**: Single source of truth. Replay, metrics, and debugging all derive from the same immutable log.
 
 **Numeric Recomputation Over String Matching**: Extract numeric claims from the response, map to source tool outputs, recompute the formula, check tolerance. Catches logical errors, not just hallucinations.

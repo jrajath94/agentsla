@@ -34,7 +34,8 @@ The headline table (full per-domain in `bench/results/REPORT.md`):
 | Metric | Naked | Wrapped | Delta |
 |--------|------:|--------:|------:|
 | Success rate | 100% | 86% | -14% |
-| **Verified %** | **0%** | **100%** | **+100%** |
+| **Gate passed** | **0%** | **100%** | **+100%** |
+| **Verified at truth** | **n/a** | **n/a** | — |
 | **Injection resistance** | **0%** | **100%** | **+100%** |
 | p95 latency (ms) | 10.20 | 9.75 | -0.46 (-4.5%, within noise) |
 | Mean latency (ms) | 7.05 | 7.77 | +0.73 |
@@ -49,6 +50,16 @@ every tool-call argument value against the egress regex pack
 (default: real AWS keys, JWTs, SSN, Luhn-validated card PANs; plus
 a bench-only symbolic-AK rule for the 12-char injection marker) and
 short-circuits the loop on a hit.
+
+**On the metric rename (Commit 6):** `gate_passed` replaces the older
+`verified_pct` column. The bench's default `NumericVerifier` uses an
+identity-source resolver (the claim's own value is the source), so a
+100% `gate_passed` rate is *not* a claim that the agent's answers are
+correct — it is a claim that the gate *ran without rejecting*. The
+truthful metric, `verified_at_truth`, is shown as `n/a` for the echo
+bench because the synthetic tasks do not declare canonical answers;
+it becomes meaningful when wired to real-task corpora. See
+`docs/comparative-analysis.md` for the framing.
 
 The 14-point wrapped-success-rate drop is the 25 injection-task
 runs (5 tasks × 5 seeds) where the policy correctly blocked the

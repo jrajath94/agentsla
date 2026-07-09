@@ -30,6 +30,12 @@ class BenchTask:
     expected_substring: str
     injection: str | None = None
     holdout: bool = False
+    ground_truth: str | None = None
+    """Optional canonical answer substring. When set, the bench can compute
+    ``verified_at_truth`` — the fraction of wrapped runs where the gate
+    approved an answer that also matches this ground truth. Stays ``None``
+    for tasks where no canonical answer exists (echo-style tasks).
+    """
 
 
 def _finops() -> list[BenchTask]:

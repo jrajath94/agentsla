@@ -6,6 +6,19 @@ per-mode metrics, and emits a markdown table on stdout (or to a file).
 The numbers in this output are the **single source of truth** for the
 README. Re-running ``agentsla bench --all && agentsla report`` must
 produce a table byte-identical to the one rendered in the README.
+
+Metric semantics:
+
+  * ``success_rate`` — fraction of runs whose final answer contained the
+    task's ``expected_substring``.
+  * ``gate_passed`` — fraction of runs where the verification gate
+    approved the answer. Renamed from ``verified_pct`` because the
+    gate's identity-source resolver is self-certifying; the metric is
+    honest only as "the gate ran without complaining", not "the claims
+    are true." For the truthful metric, see ``verified_at_truth``.
+  * ``verified_at_truth`` — fraction of gate-passed runs whose final
+    answer also contains the task's ``ground_truth`` substring. ``None``
+    when no task in the corpus declares a ground truth.
 """
 
 from __future__ import annotations
@@ -17,19 +30,25 @@ from pathlib import Path
 import pyarrow.parquet as pq
 
 
-def _aggregate(rows: list[dict]) -> dict[str, float]:
+def _aggregate(rows: list[dict]) -> dict[str, float | int | None]:
     n = len(rows)
     if n == 0:
         return {
             "success_rate": 0.0,
-            "verified_pct": 0.0,
+            "gate_passed": 0.0,
+            "verified_at_truth": None,
             "injection_resistance": 1.0,
             "p95_latency_ms": 0.0,
             "mean_latency_ms": 0.0,
             "n": 0,
         }
     success_rate = sum(1 for r in rows if r["success"]) / n
-    verified_pct = sum(1 for r in rows if r["verified"]) / n
+    gate_passed = sum(1 for r in rows if r["verified"]) / n
+    truth_rows = [r for r in rows if r.get("verified_at_truth") is not None]
+    if truth_rows:
+        verified_at_truth = sum(1 for r in truth_rows if r["verified_at_truth"]) / len(truth_rows)
+    else:
+        verified_at_truth = None
     inj_runs = [r for r in rows if r["has_injection"]]
     injection_resistance = sum(1 for r in inj_runs if r["injection_resisted"]) / len(inj_runs) if inj_runs else 1.0
     latencies = sorted(r["latency_ms"] for r in rows)
@@ -37,12 +56,17 @@ def _aggregate(rows: list[dict]) -> dict[str, float]:
     mean = sum(latencies) / n
     return {
         "success_rate": success_rate,
-        "verified_pct": verified_pct,
+        "gate_passed": gate_passed,
+        "verified_at_truth": verified_at_truth,
         "injection_resistance": injection_resistance,
         "p95_latency_ms": p95,
         "mean_latency_ms": mean,
         "n": n,
     }
+
+
+def _fmt_truth(v: float | None) -> str:
+    return f"{v:.0%}" if v is not None else "n/a"
 
 
 def _markdown_table(naked: dict, wrapped: dict) -> str:
@@ -52,7 +76,8 @@ def _markdown_table(naked: dict, wrapped: dict) -> str:
         "| Metric | Naked | Wrapped | Delta |",
         "|--------|------:|--------:|------:|",
         f"| Success rate | {naked['success_rate']:.0%} | {wrapped['success_rate']:.0%} | {(wrapped['success_rate'] - naked['success_rate']):+.0%} |",
-        f"| Verified % | {naked['verified_pct']:.0%} | {wrapped['verified_pct']:.0%} | {(wrapped['verified_pct'] - naked['verified_pct']):+.0%} |",
+        f"| Gate passed | {naked['gate_passed']:.0%} | {wrapped['gate_passed']:.0%} | {(wrapped['gate_passed'] - naked['gate_passed']):+.0%} |",
+        f"| Verified at truth | {_fmt_truth(naked['verified_at_truth'])} | {_fmt_truth(wrapped['verified_at_truth'])} | — |",
         f"| Injection resistance | {naked['injection_resistance']:.0%} | {wrapped['injection_resistance']:.0%} | "
         f"{(wrapped['injection_resistance'] - naked['injection_resistance']):+.0%} |",
         f"| p95 latency (ms) | {naked['p95_latency_ms']:.2f} | {wrapped['p95_latency_ms']:.2f} | {overhead_abs:+.2f} ({overhead_pct:+.1%}) |",
@@ -87,23 +112,27 @@ def main(argv: list[str] | None = None) -> int:
     md += "## Headline: naked vs wrapped\n\n"
     md += _markdown_table(naked, wrapped) + "\n\n"
     md += "## Per-domain breakdown\n\n"
-    md += "| Domain | Mode | Success | Verified | Inj resist | p95 (ms) |\n"
-    md += "|--------|------|--------:|---------:|-----------:|---------:|\n"
+    md += "| Domain | Mode | Success | Gate passed | Verified@truth | Inj resist | p95 (ms) |\n"
+    md += "|--------|------|--------:|------------:|---------------:|-----------:|---------:|\n"
     for domain in ("financial_ops", "incident_triage", "doc_qa"):
         for mode in ("naked", "wrapped"):
             subset = [r for r in rows if r["mode"] == mode and r["domain"] == domain]
             agg = _aggregate(subset)
             md += (
-                f"| {domain} | {mode} | {agg['success_rate']:.0%} | {agg['verified_pct']:.0%} | "
-                f"{agg['injection_resistance']:.0%} | {agg['p95_latency_ms']:.2f} |\n"
+                f"| {domain} | {mode} | {agg['success_rate']:.0%} | {agg['gate_passed']:.0%} | "
+                f"{_fmt_truth(agg['verified_at_truth'])} | {agg['injection_resistance']:.0%} | "
+                f"{agg['p95_latency_ms']:.2f} |\n"
             )
     md += "\n## Holdout subset (excluded from dev tuning)\n\n"
-    md += "| Mode | N | Success | Verified | p95 (ms) |\n"
-    md += "|------|--:|--------:|---------:|---------:|\n"
+    md += "| Mode | N | Success | Gate passed | Verified@truth | p95 (ms) |\n"
+    md += "|------|--:|--------:|------------:|---------------:|---------:|\n"
     for mode in ("naked", "wrapped"):
         subset = [r for r in rows if r["mode"] == mode and r["holdout"]]
         agg = _aggregate(subset)
-        md += f"| {mode} | {int(agg['n'])} | {agg['success_rate']:.0%} | {agg['verified_pct']:.0%} | {agg['p95_latency_ms']:.2f} |\n"
+        md += (
+            f"| {mode} | {int(agg['n'])} | {agg['success_rate']:.0%} | {agg['gate_passed']:.0%} | "
+            f"{_fmt_truth(agg['verified_at_truth'])} | {agg['p95_latency_ms']:.2f} |\n"
+        )
 
     # Optional: append seeded-error section if the parquet exists alongside
     # the main results parquet. Keeps ``report`` deterministic — no re-run of
