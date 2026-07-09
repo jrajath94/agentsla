@@ -14,7 +14,8 @@ adapter calls :meth:`run` here to produce it.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from uuid import UUID, uuid4
+from typing import Any
+from uuid import uuid4
 
 from agentsla.core.events import ClaimVerdict as EventClaimVerdict
 from agentsla.core.events import Verdict
@@ -50,9 +51,17 @@ class VerificationGate:
         self.writer = writer
         self.verifier = verifier
 
-    def run(self, trace_id: UUID, final_answer: str) -> GateResult:
-        """Run chain; build Verdict; append to writer; return both."""
-        result = self.chain.run(trace_id, final_answer)
+    def run(self, trace: Any, final_answer: str) -> GateResult:
+        """Run chain; build Verdict; append to writer; return both.
+
+        ``trace`` must expose ``.trace_id`` (UUID). The chain receives the
+        full trace object so verifiers can inspect the event stream
+        (numeric recompute, grounding, schema checks). This signature
+        matches :meth:`VerificationChain.run` — the gate is the typed
+        boundary that turns a chain result into a persisted Verdict event.
+        """
+        result = self.chain.run(trace, final_answer)
+        trace_id = trace.trace_id
         next_seq = self.writer.next_seq(trace_id)
         verdict = self._build_verdict(trace_id, next_seq, result)
         self.writer.append(verdict)
@@ -60,7 +69,7 @@ class VerificationGate:
 
     # ----- internals -----
 
-    def _build_verdict(self, trace_id: UUID, seq: int, result: ChainResult) -> Verdict:
+    def _build_verdict(self, trace_id: Any, seq: int, result: ChainResult) -> Verdict:
         per_claim: list[EventClaimVerdict] = []
         for c in result.claims:
             # Skip claims without numeric content for the event shape
