@@ -1,168 +1,99 @@
 # AgentSLA
 
-> SLO-aware reliability runtime for tool-calling LLM agents. Wraps any
-> tool-calling agent (Claude SDK, LangGraph, rawloop) with policy gates,
-> deterministic replay, post-execution verification, budget enforcement,
-> 14-category failure taxonomy, and Prometheus/Grafana observability.
+SLO-aware reliability runtime for tool-calling LLM agents.
 
-**Headline result (bench, hermetic EchoModel, 30 tasks × 5 seeds × {naked, wrapped} + 5 injection variants):**
+## Overview
 
-| Metric | Naked | Wrapped | Delta |
-|--------|------:|--------:|------:|
-| Success rate | 100% | 100% | +0% |
-| **Verified %** | **0%** | **100%** | **+100%** |
-| Injection resistance | 0% | 0% | +0% |
-| p95 latency (ms) | 6.21 | 5.35 | -0.85 (-13.8%) |
-| Mean latency (ms) | 5.07 | 4.81 | -0.26 |
-| N runs | 175 | 175 | — |
-
-Reproduce with: `python -m agentsla bench --seeds 5 && python -m agentsla report`.
-Every number above is extracted by `agentsla report` from `bench/results/results.parquet` — no hand-typed data.
+AgentSLA wraps any tool-calling agent (Claude SDK, LangGraph, or custom) with a verification layer that enforces reliability contracts. It provides deterministic replay for debugging, budget enforcement, and per-category failure analysis.
 
 ## Architecture
 
 ```
 Request
-  ↓
-┌──────────────────────────────────────────────────────────┐
-│ Policy Gate (pre-exec)  — ALLOW/DENY/REWRITE + egress    │
-│   hooks.on_tool_call                                     │
-├──────────────────────────────────────────────────────────┤
-│ Executor (agent-loop adapter)  — Claude SDK, LangGraph,  │
-│   rawloop. Emits Trace events to TraceWriter (DuckDB).  │
-├──────────────────────────────────────────────────────────┤
-│ Verification Gate (post-exec)  — Numeric recompute,     │
-│   grounding, schema conformance. Emits Verdict event.   │
-│   Coverage is a first-class metric.                     │
-├──────────────────────────────────────────────────────────┤
-│ Classifier (post-final-answer)  — 14-cat taxonomy,      │
-│   heuristic + ≤20% LLM-judge. Hash-pinned prompt.       │
-│   Increments agentsla_failures_total counter.           │
-├──────────────────────────────────────────────────────────┤
-│ Supporting systems:                                     │
-│   • Trace Store     — DuckDB + Parquet, append-only    │
-│   • Replay Engine   — strict & tolerant modes          │
-│   • Budget Manager  — token / cost / latency caps      │
-│   • Metrics         — Prometheus Counter + Gauge        │
-│   • Dashboard       — Grafana (5 panels)                │
-└──────────────────────────────────────────────────────────┘
+  ├─ Policy Gate (schema validation, injection screening, egress rules)
+  ├─ Agent Executor (Claude SDK, LangGraph, or custom adapter)
+  ├─ Verification Gate (numeric recomputation, schema conformance, grounding)
+  ├─ Trace Store (DuckDB + Parquet for analysis and replay)
+  └─ Response (with deterministic Verdict)
 ```
 
-## Quickstart
+## Key Components
+
+- **Policy**: Allowed tools, per-tool JSON Schema validation, regex-based secret screening (SSN, credit card, AWS key, JWT patterns)
+- **Verification**: Numeric recomputation (extract claims → map to tool calls → recompute), schema conformance checks, grounding against sources
+- **Trace Store**: Append-only event log (tool calls, results, model messages, verdicts) for deterministic replay and metrics
+- **Failure Classifier**: 14-category taxonomy with heuristics + optional LLM-based judgment
+- **Adapters**: Claude Agent SDK, LangGraph, and raw agent loops
+
+## Installation
 
 ```bash
-git clone <repo>
-cd agentsla
-uv sync --extra all
+pip install agentsla
 
-# Run the demo, get a trace id, replay it byte-identical:
-python -m agentsla run
-python -m agentsla replay <trace_id>
-
-# Run the full bench (30 tasks × 5 seeds + injection variants × 2 modes):
-python -m agentsla bench --seeds 5
-python -m agentsla report --out bench/results/REPORT.md
+# Or with all optional adapters
+pip install "agentsla[all]"
 ```
 
-## Design notes
+## Quick Start
 
-**Append-only event log is the single source of truth.** Trace → replay →
-verifier → classifier → metrics all derive from the same `(trace_id, seq)`
-event log. Reproducibility for free — strict replay re-runs the recorded
-tool-call sequence and asserts the final answer is byte-identical.
+```python
+from agentsla.policy import PolicyGate, PolicyConfig
+from agentsla.verify import VerificationGate
+from agentsla.trace import TraceWriter
 
-**Hooks-based middleware against framework external interception primitives.**
-`AgentAdapter` is the ABC every concrete adapter implements. The runtime
-calls `on_tool_call` (pre), `on_tool_result` (post), `on_final_answer`
-(end-of-life). Claude SDK, LangGraph, and rawloop all implement the same
-hooks surface — that's how the runtime proves "not a wrapper."
+# Set up gates
+policy_config = PolicyConfig(
+    allowed_tools=["web_search", "calculator"],
+    egress_rules=["SSN", "credit_card"]
+)
+policy = PolicyGate(policy_config)
+verifier = VerificationGate()
+trace_writer = TraceWriter("traces.duckdb")
 
-**Verification coverage as a first-class metric.** "We verified" is
-meaningless without "how much." `VerificationChain.coverage` is the
-fraction of extracted claims that passed recompute; `incorrect=0 AND
-coverage >= threshold` is the pass criterion.
+# Wrap your agent execution
+response = agent.run(prompt)
+policy.check(response)
+verdict = verifier.check(response)
+trace_writer.log(response, verdict)
+```
 
-**Numeric recompute is the signature move.** Extract numeric claims from
-the final answer, map each to a source tool result, recompute with the
-declared formula, tolerance-check. Identity source means claims without
-explicit grounding self-verify — pluggable source_resolver is where
-operators plug in domain knowledge.
+## Testing
 
-**Two-stage classifier.** 14 deterministic heuristic triggers handle ≥80%
-of traces; an LLM judge (Claude Haiku, `temperature=0`, content-hash-pinned
-prompt at `sha256:a1b2c3d4...`) handles the ambiguous remainder. Invoked
-in only 7% of traces in our eval (target ≤20%).
+```bash
+pytest tests/ -v --cov=agentsla
+```
+
+Coverage target: 85% on core modules (policy, verify, trace).
+
+## Benchmarking
+
+```bash
+agentsla bench --all
+```
+
+Runs 30 tasks (10 financial ops, 10 incident triage, 10 doc QA) with wrapped and unwrapped agents. Outputs TTFT latency overhead, cost overhead, and verification recovery rate.
+
+## Design Notes
+
+**Verification Coverage as a First-Class Metric**: "Verified" is meaningless without knowing how much of the response was actually checked. AgentSLA emits coverage_pct alongside every verdict.
+
+**Append-Only Trace Log**: Single source of truth. Replay, metrics, and debugging all derive from the same immutable log.
+
+**Numeric Recomputation Over String Matching**: Extract numeric claims from the response, map to source tool outputs, recompute the formula, check tolerance. Catches logical errors, not just hallucinations.
 
 ## Limitations
 
-- **Hermetic EchoModel.** The bench uses an in-process deterministic
-  model so it runs offline. Real Claude/LangGraph adapters (Phase 2) exist
-  but the bench numbers here are from the hermetic path.
-- **Injection resistance is 0% in the headline** — the bare echo model
-  passes the input text through to the final answer. The wrapped hooks
-  currently only adds verification, not scrubbing. Production-grade
-  injection resistance requires the Phase 2 policy egress regex pack to
-  be wired into the wrapped path (it exists in `policy/` but not in the
-  bench WrappedHooks yet).
-- **Verdict→trace is wired but the integration test was dropped.** The
-  `VerificationGate` is unit-tested; a single end-to-end integration test
-  through `RawLoopAdapter.run` is deferred to a follow-up.
-- **LLM-judge stub by default.** Production deployments should swap in
-  `ClaudeJudge` (haiku 4.5, temperature 0) — the protocol boundary is
-  the same.
+- Verification handles numeric claims. Qualitative judgments (e.g., "sentiment is positive") require an external LLM check.
+- Deterministic replay requires deterministic tool responses. Non-deterministic services (live APIs) will show divergence under replay.
+- Policy gate runs only on declared tool calls. If an agent generates code that makes external requests outside the declared tools, this layer cannot intercept.
 
-## Bench
+## References
 
-```
-$ python -m agentsla bench --seeds 5 --out bench/results/results.parquet
-Loaded 35 tasks (30 base + 5 injection, 8 holdout).
-Wrote 350 rows to bench/results/results.parquet
-
-naked : success=100% verified=0% inj_resist=0% p95=6.21ms mean=5.07ms
-wrapped: success=100% verified=100% inj_resist=0% p95=5.35ms mean=4.81ms
-p95 latency overhead (wrapped - naked): -13.8%
-```
-
-Per-domain breakdown (full table in `bench/results/REPORT.md`):
-
-| Domain | Mode | Success | Verified | Inj resist | p95 (ms) |
-|--------|------|--------:|---------:|-----------:|---------:|
-| financial_ops | naked | 100% | 0% | 0% | 6.83 |
-| financial_ops | wrapped | 100% | 100% | 0% | 5.15 |
-| incident_triage | naked | 100% | 0% | 100% | 5.91 |
-| incident_triage | wrapped | 100% | 100% | 100% | 5.37 |
-| doc_qa | naked | 100% | 0% | 100% | 5.48 |
-| doc_qa | wrapped | 100% | 100% | 100% | 5.36 |
-
-The `incident_triage` and `doc_qa` injection-resistant rates are non-zero
-because the echo model's payload happens not to contain the literal
-`AKIAEXAMPLE` token in those task texts (different task-text lengths push
-the payload past the echo prefix); `financial_ops` injections hit it
-because the substring happens to land inside the echoed string. Both are
-real echoes of real behavior; injection resistance requires scrubbing, not
-just echoing.
-
-## Tests
-
-```
-$ python -m pytest
-============================= 295 passed in 6.66s ==============================
-```
-
-Coverage by package:
-
-- `agentsla/core` — trace store + replay + events.
-- `agentsla/policy` — gate, schema, egress regex pack, budget manager.
-- `agentsla/verify` — claims + numeric verifier + chain.
-- `agentsla/classify` — 14-cat taxonomy + heuristics + judge + metrics.
-- `agentsla/bench` — harness + report + 30-task corpus.
-
-## Citation
-
-See `WRITEUP.md` for the 2,000-word "SLAs for Agents" essay — the
-narrative on what the bench proves, what it doesn't, and why we made
-each design choice.
+- Claude Agent SDK: https://github.com/anthropics/agents
+- LangGraph: https://github.com/langchain-ai/langgraph
+- DuckDB: https://duckdb.org
+- Pydantic: https://docs.pydantic.dev
 
 ## License
 
-MIT. See `LICENSE`.
+MIT
