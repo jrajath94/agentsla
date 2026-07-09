@@ -79,3 +79,54 @@ jobs:
             exit 1
           fi
           printf 'all commit subjects OK\n'
+
+  integration:
+    name: Integration check (bench + seeded errors)
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv sync --extra all
+
+      # 1. Bench reproducer: every README headline number must be
+      # regenerable from this parquet. Small N (seeds=2) keeps the
+      # gate under 30 s while still asserting E2E works.
+      - name: Bench reproducer (seeds=2)
+        run: |
+          uv run python -m agentsla bench --seeds 2 --out bench/results/results.parquet
+          test -s bench/results/results.parquet
+          echo "parquet bytes: $(wc -c < bench/results/results.parquet)"
+
+      - name: Report from parquet
+        run: |
+          uv run python -m agentsla report --out bench/results/REPORT.md
+          test -s bench/results/REPORT.md
+          grep -q "Headline: naked vs wrapped" bench/results/REPORT.md
+
+      # 2. Seeded-error experiment: small N, asserts sensitivity > 0
+      # at non-trivial perturbation. Catches any regression that
+      # breaks the gate's correctness signal.
+      - name: Seeded-error experiment (small N)
+        run: |
+          uv run python -m agentsla bench-seeded-errors \
+            --strategies 0,50 --trials 5 \
+            --out bench/results/seeded_errors.parquet \
+            --report-section-out bench/results/seeded_errors_section.md
+          test -s bench/results/seeded_errors_section.md
+          grep -q "Seeded-error experiment" bench/results/seeded_errors_section.md
+          # Sensitivity at +/-50% must be > 0 (gate catches at least one).
+          awk -F'|' '/±50.0%/ { gsub(/[, %]/, "", $4); if ($4+0 > 0) exit 0; else exit 1 }' \
+            bench/results/seeded_errors_section.md
+          echo "seeded-error gate passed"
+
+      # 3. Report re-emission: the seeded-error section must append
+      # cleanly to REPORT.md when seeded_errors.parquet is present.
+      - name: Report includes seeded section
+        run: |
+          uv run python -m agentsla report --out bench/results/REPORT.md
+          grep -q "Seeded-error experiment" bench/results/REPORT.md
