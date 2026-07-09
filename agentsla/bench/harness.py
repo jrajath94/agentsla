@@ -294,7 +294,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--db", type=Path, default=Path(".agentsla/bench.duckdb"), help="Trace-store DuckDB path.")
     parser.add_argument("--seeds", type=int, default=5, help="Number of seeds per (mode, task).")
     parser.add_argument("--include-injection", action="store_true", default=True, help="Include injection-attack variants (default True).")
-    parser.add_argument("--metrics-port", type=int, default=None, help="If set, start a Prometheus /metrics HTTP server on this port before running the bench. Closes the gap between the shipped Grafana dashboard JSON (which expects live series) and the bench's in-memory counters.")
+    parser.add_argument(
+        "--metrics-port",
+        type=int,
+        default=None,
+        help=(
+            "If set, start a Prometheus /metrics HTTP server on this port before running the bench. "
+            "Closes the gap between the shipped Grafana dashboard JSON (which expects live series) and "
+            "the bench's in-memory counters. Default bind address is 127.0.0.1 (loopback only). "
+            "Pass --metrics-addr to expose on another interface (NOT recommended outside trusted LANs)."
+        ),
+    )
+    parser.add_argument(
+        "--metrics-addr",
+        default="127.0.0.1",
+        help=(
+            "Bind address for the Prometheus /metrics HTTP server. Defaults to 127.0.0.1 to keep the "
+            "endpoint off the LAN. Override with --metrics-addr 0.0.0.0 only when running inside a "
+            "trusted scrape network — the endpoint exposes failure counts and verification coverage."
+        ),
+    )
     args = parser.parse_args(argv)
 
     metrics_server = None
@@ -302,8 +321,11 @@ def main(argv: list[str] | None = None) -> int:
         try:
             from prometheus_client import start_http_server
 
-            metrics_server = start_http_server(args.metrics_port)
-            print(f"Prometheus /metrics serving on :{args.metrics_port}")
+            # Security: prometheus_client.start_http_server defaults to 0.0.0.0 (all interfaces),
+            # which would expose failure metrics to anything reachable on the developer's LAN.
+            # Bind loopback by default; require an explicit --metrics-addr opt-in for anything else.
+            metrics_server = start_http_server(args.metrics_port, addr=args.metrics_addr)
+            print(f"Prometheus /metrics serving on {args.metrics_addr}:{args.metrics_port}")
         except ImportError as exc:  # pragma: no cover — optional dep
             print(
                 f"WARNING: --metrics-port requested but prometheus_client not available ({exc}); skipping",
