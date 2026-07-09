@@ -204,6 +204,36 @@ v0.1 audit are now closed (Phase 2 PolicyGate and Phase 4
 Classifier are wired into WrappedHooks; 175 labels written per
 bench run). The honest remaining work is:
 
+## Architecture (one picture)
+
+```mermaid
+flowchart LR
+    subgraph Agent["Agent runtime (any of: RawLoop, LangGraph, Claude SDK)"]
+        A1[ToolCall] --> A2[Tool Result]
+        A2 --> A3[Final Answer]
+    end
+
+    A1 -->|on_tool_call| PG[PolicyGate<br/>egress regex pack<br/>ALLOW / DENY / REWRITE]
+    PG -->|allowed| A2
+
+    A2 -->|on_tool_result| TW[(TraceWriter<br/>DuckDB append-only)]
+    TW -->|stored| TS[(TraceStore<br/>Parquet export)]
+
+    A3 -->|on_final_answer| VG[VerificationChain<br/>Numeric / Schema / Grounding]
+    VG --> GR[VerificationGate]
+    GR -->|emit Verdict| TW
+    GR -->|result| CL[Classifier<br/>14 triggers + StubJudge]
+    CL --> LS[(JsonlLabelSink<br/>labels.jsonl)]
+    CL --> PM[Prometheus counters]
+
+    TS --> RD[TraceReader<br/>deterministic replay]
+    RD -->|strict / tolerant| A1
+```
+
+See [`docs/comparative-analysis.md`](docs/comparative-analysis.md)
+for the side-by-side framing against LangSmith / Langfuse / Helicone
+/ Braintrust.
+
 1. **Real classifier eval.** The current 100% agreement is circular
    (synthetic traces from same triggers as the classifier). A live
    Claude API replay would produce a number with signal.
