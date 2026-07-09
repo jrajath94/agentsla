@@ -62,6 +62,48 @@ verdict = verifier.check(response)
 trace_writer.log(response, verdict)
 ```
 
+## Authoring a policy
+
+The full policy schema is declarative YAML. The minimum viable policy
+permits a tool set and inherits the shipped egress pack:
+
+```yaml
+allowed_tools:
+  - web_search
+  - calculator
+```
+
+Every field is optional. To add per-tool schema validation, egress
+detectors, and trace caps, see [`examples/policy.yaml`](examples/policy.yaml)
+— every section is annotated. Load with:
+
+```python
+from agentsla.policy import load_policy, PolicyGate
+
+policy = load_policy("examples/policy.yaml")
+gate = PolicyGate(policy)
+```
+
+The schema validates at load time via Pydantic v2 (`extra="forbid"`,
+`frozen=True`). Unknown fields raise `ValidationError`; runtime
+mutation is not permitted. The shipped default pack covers PAN with
+Luhn validation, SSN, AWS access keys, and JWTs. To start from the
+default pack and append your own detectors, omit `egress_rules`
+entirely (defaults are inserted) and add a tenant-specific rule at
+the end:
+
+```yaml
+egress_rules:
+  # ... default pack entries ...
+  - name: internal_project_code
+    regex: '\bPROJ-[0-9]{4,6}\b'
+    severity: deny
+```
+
+`mode: shadow` logs DENY decisions without short-circuiting the
+trace — useful when rolling out a new rule and you want to measure
+false-positive rates against live traffic before enforcement.
+
 ## Testing
 
 ```bash

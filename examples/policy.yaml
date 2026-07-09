@@ -1,0 +1,95 @@
+# AgentSLA policy example — annotated.
+#
+# Load via:   python -c "from agentsla.policy import load_policy; load_policy('examples/policy.yaml')"
+# Or pass to PolicyGate:  gate = PolicyGate(load_policy('examples/policy.yaml'))
+#
+# Every field below is optional; this file shows the full surface
+# for documentation purposes. The minimum viable policy is:
+#
+#     allowed_tools: ["my_tool"]
+#
+# which produces a Policy that permits the named tool and uses the
+# shipped default egress pack (PAN, SSN, AWS key, JWT detection).
+
+# ---------------------------------------------------------------------------
+# Allowed tools (POLICY-01)
+# ---------------------------------------------------------------------------
+# Tools the agent may call. Empty list = deny everything. Unknown
+# tool names are denied at policy-check time with HookDecision(allow=False).
+allowed_tools:
+  - web_search
+  - calculator
+  - json_echo
+
+# ---------------------------------------------------------------------------
+# Per-tool rules (POLICY-02)
+# ---------------------------------------------------------------------------
+# Tool-specific enforcement. ``json_schema`` validates tool args
+# (requires the optional ``jsonschema`` dependency); ``max_calls``
+# caps how many times the tool may be invoked per trace.
+tool_rules:
+  - name: web_search
+    json_schema: |
+      {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "minLength": 1, "maxLength": 500}
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      }
+    max_calls: 5
+  - name: calculator
+    json_schema: |
+      {
+        "type": "object",
+        "properties": {
+          "expression": {"type": "string"}
+        },
+        "required": ["expression"]
+      }
+    # No max_calls → unbounded within the global trace cap below.
+
+# ---------------------------------------------------------------------------
+# Egress rule pack (POLICY-03)
+# ---------------------------------------------------------------------------
+# Detector list. Each rule's regex runs against every string leaf in
+# tool-call args. A hit at severity=deny short-circuits the trace;
+# severity=rewrite emits a redacted call instead.
+#
+# If this section is omitted, the shipped default pack is inserted
+# (PAN with Luhn, SSN, AWS access key, JWT). Set ``egress_rules: []``
+# explicitly to disable all egress scanning.
+egress_rules:
+  # Default-style detectors (the same regexes used in the shipped pack).
+  - name: pan
+    regex: '\b(?:\d[ -]*?){13,19}\b'
+    severity: deny
+  - name: ssn
+    regex: '\b\d{3}-\d{2}-\d{4}\b'
+    severity: deny
+  - name: aws_key
+    regex: '\bAKIA[0-9A-Z]{16}\b'
+    severity: deny
+  - name: jwt
+    regex: '\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b'
+    severity: deny
+  # Tenant-specific detectors go below.
+  - name: internal_project_code
+    regex: '\bPROJ-[0-9]{4,6}\b'
+    severity: deny
+
+# ---------------------------------------------------------------------------
+# Global caps (POLICY-04)
+# ---------------------------------------------------------------------------
+# Maximum tool calls permitted per trace, regardless of per-tool caps.
+max_calls_per_trace: 20
+
+# ---------------------------------------------------------------------------
+# Mode (POLICY-05)
+# ---------------------------------------------------------------------------
+# ``enforce`` = DENY short-circuits the trace (default).
+# ``shadow``  = log DENY decisions without short-circuiting; useful
+#               when rolling out a new rule pack and you want to
+#               measure false-positive rates before turning it on.
+mode: enforce
