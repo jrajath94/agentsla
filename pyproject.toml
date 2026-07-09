@@ -128,22 +128,16 @@ disallow_untyped_defs = true
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "hypothesis.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
 module = "duckdb"
 ignore_missing_imports = true
 
-[[tool.mypy.overrides]]
-module = "pyarrow.parquet"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-# Tests can be looser; production code stays strict.
-check_untyped_defs = false
-disallow_untyped_defs = false
+# NOTE: the agentsla/{core,policy,verify} source tree does not import
+# hypothesis, pyarrow.parquet, or tests.* — the mypy --strict target
+# (TYPING-01) intentionally limits scope to those three modules.
+# Earlier overrides for those modules were removed in v0.1.0 because
+# mypy raised unused-section warnings when the target tree did not
+# transitively import them. Re-add an override here ONLY if the target
+# scope expands.
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

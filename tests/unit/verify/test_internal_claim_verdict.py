@@ -30,6 +30,5 @@ def test_old_name_claim_verdict_removed_from_verify_base() -> None:
     import agentsla.verify.base as base_mod
 
     assert not hasattr(base_mod, "ClaimVerdict"), (
-        "agentsla.verify.base.ClaimVerdict was renamed to InternalClaimVerdict; "
-        "the old name collides with agentsla.core.events.ClaimVerdict."
+        "agentsla.verify.base.ClaimVerdict was renamed to InternalClaimVerdict; the old name collides with agentsla.core.events.ClaimVerdict."
     )

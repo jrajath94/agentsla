@@ -84,6 +84,4 @@ def test_naked_run_writes_zero_verdict_events() -> None:
         finally:
             writer.close()
 
-        assert _verdict_count(db_path) == 0, (
-            "NoOpHooks must not emit Verdict events; naked runs are the no-relay baseline."
-        )
+        assert _verdict_count(db_path) == 0, "NoOpHooks must not emit Verdict events; naked runs are the no-relay baseline."

@@ -158,16 +158,12 @@ class TestReasoningError:
 
     def test_numbered_steps_do_not_fire(self) -> None:
         """Regression: "Step 1: … Step 2: …" enumerations are not contradictions."""
-        trace = make_trace(
-            final_answer="Step 1: get 100. Step 2: get 50. Step 3: get 25."
-        )
+        trace = make_trace(final_answer="Step 1: get 100. Step 2: get 50. Step 3: get 25.")
         assert trigger_reasoning_error(trace) is None
 
     def test_multi_word_anchor_matches(self) -> None:
         """Anchor covers the first two words; catches "The total is" pattern."""
-        trace = make_trace(
-            final_answer="The total cost is 100. The total cost is 50."
-        )
+        trace = make_trace(final_answer="The total cost is 100. The total cost is 50.")
         assert trigger_reasoning_error(trace) is FailureCategory.REASONING_ERROR
 
     def test_distinct_two_word_anchors_do_not_fire(self) -> None:
