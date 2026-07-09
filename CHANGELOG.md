@@ -91,3 +91,51 @@ Built on top of the Phase 1-5 surface (trace store + replay,
 verification chain, classifier, budget manager). The hardening push
 addresses the gaps the v0.1 audit identified; the audit items are
 closed in the relevant commits above.
+
+## [v0.2.0] — in development
+
+Next push on top of v0.1.0. The hardening invariants of v0.1.0
+(deterministic replay, post-execution verification, egress policy,
+append-only event log) hold; v0.2.0 closes the documentation + test
+gaps that the audit named "out of scope" but that are achievable
+without API keys or GPU.
+
+### Highlights
+
+- **Property-based test suite for `PolicyGate`**: 13 invariants
+  exercised with `hypothesis` — denies, max_calls bound enforcement,
+  schema enforcement, egress deny/rewrite semantics, audit monotonicity,
+  policy frozen-after-load, Luhn false-positive guard, nested-arg
+  egress walk, and `args_hash` invariant on ALLOW. Complements the
+  static 20-case matrix in `tests/unit/policy/test_gate.py`. See
+  `tests/property/test_policy_gate.py`.
+- **Trace schema migration story**: `SCHEMA_VERSION` constant exported
+  from `agentsla.core.events`; `docs/schema-migrations.md` describes
+  the upgrade path for v0.1 → v0.2 trace databases, with a worked
+  example. Forward-compatible for future schema bumps.
+
+### Atomic commits (oldest → newest)
+
+| # | Hash | Subject |
+|---|------|---------|
+| 1 | 8e8fb94 | test(policy): property-based invariants for PolicyGate |
+| 2 | (this commit) | chore(release): bump 0.1.0.dev0 → 0.2.0.dev0 + CHANGELOG v0.2 section |
+
+### Out of scope (still deferred, or newly so)
+
+- Live-LLM bench against Claude API (needs `ANTHROPIC_API_KEY`).
+- OpenTelemetry exporter (new dep surface + W3C TraceContext).
+- Multi-tenancy / per-tenant policy (governance decisions TBD).
+- Streaming trace emission.
+- Training a custom classifier.
+- Async / backpressure trace writer (separate design pass).
+- Re-attempted `RawLoopAdapter.run` cross-adapter parity bench
+  (already exists as `tests/integration/test_cross_adapter_parity.py`).
+
+### Acknowledgements (v0.2.0)
+
+The property-based test surface was added in response to the v0.1.0
+audit's "property-based tests for the policy gate" deferral. Each
+invariant in `tests/property/test_policy_gate.py` is documented with
+its policy-side counterpart so a future reviewer can trace any
+regression back to the gate implementation it defends.
