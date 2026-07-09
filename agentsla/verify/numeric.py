@@ -38,8 +38,12 @@ class NumericVerifier:
     Args:
         source_resolver: Callable ``(claim, trace) -> value | None``.
             Operators override to map a claim to a recomputable source.
-        tolerance: Absolute tolerance for float comparison. Default
-            ``1e-6``. Set to ``0.0`` for strict integer equality.
+        tolerance: Relative tolerance for float comparison, computed as
+            ``abs(observed - expected) / max(abs(observed), abs(expected), 1e-12)``.
+            Default ``1e-6``. Set to ``0.0`` for strict integer equality.
+            Per-verifier instances carry independent tolerances; pick
+            a tighter bound for financial-ops and a looser one for
+            qualitative doc-QA — see ``WRITEUP.md § Tradeoffs``.
         coverage_threshold: Forwarded to :class:`ChainResult`.
     """
 
