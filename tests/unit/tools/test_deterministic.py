@@ -33,4 +33,5 @@ def test_json_echo_is_stable() -> None:
     # Sorted by key (sort_keys=True); round-trip via json.loads to assert
     # structural equality independent of any ordering quirks.
     import json as _json
+
     assert _json.loads(out) == {"x": 1, "y": 2}

@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from agentsla.policy import Policy, load_policy
-
 
 EXAMPLE = Path(__file__).resolve().parents[2] / "examples" / "policy.yaml"
 

@@ -6,8 +6,10 @@ import pytest
 
 prometheus_client = pytest.importorskip("prometheus_client")
 
-from prometheus_client import CollectorRegistry  # noqa: E402
-from prometheus_client import generate_latest  # noqa: E402
+from prometheus_client import (  # noqa: E402 — must follow importorskip
+    CollectorRegistry,
+    generate_latest,
+)
 
 from agentsla.classify import FailureCategory  # noqa: E402
 from agentsla.classify.classifier import ClassificationResult  # noqa: E402

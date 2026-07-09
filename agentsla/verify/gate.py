@@ -16,10 +16,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
-from agentsla.core.events import ClaimVerdict as EventClaimVerdict, Verdict
+from agentsla.core.events import ClaimVerdict as EventClaimVerdict
+from agentsla.core.events import Verdict
 from agentsla.core.trace import TraceWriter
 from agentsla.verify import ChainResult, VerificationChain
-from agentsla.verify.claims import extract_numeric_claims
 
 
 @dataclass
@@ -60,9 +60,7 @@ class VerificationGate:
 
     # ----- internals -----
 
-    def _build_verdict(
-        self, trace_id: UUID, seq: int, result: ChainResult
-    ) -> Verdict:
+    def _build_verdict(self, trace_id: UUID, seq: int, result: ChainResult) -> Verdict:
         per_claim: list[EventClaimVerdict] = []
         for c in result.claims:
             # Skip claims without numeric content for the event shape

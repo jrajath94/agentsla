@@ -165,17 +165,11 @@ class ToolCall(_StrictModel):
     ts: Timestamp = Field(default_factory=now_timestamp, description="Wall-clock time emitted.")
     parent_msg_id: UUID | None = Field(
         default=None,
-        description=(
-            "ModelMessage.response_id that triggered this call, when applicable. "
-            "None when the call originates from a control-plane rule."
-        ),
+        description=("ModelMessage.response_id that triggered this call, when applicable. None when the call originates from a control-plane rule."),
     )
     args_hash: str = Field(
         default="",
-        description=(
-            "Canonical-JSON sha256 of `args`; populated by the writer. Empty "
-            "value accepted at validation time (writer overwrites)."
-        ),
+        description=("Canonical-JSON sha256 of `args`; populated by the writer. Empty value accepted at validation time (writer overwrites)."),
     )
 
     @field_validator("args_hash")
@@ -238,10 +232,7 @@ class ModelMessage(_StrictModel):
         ),
     )
     response_id: TypeIdStr = Field(
-        description=(
-            "Mandatory upstream response identifier (e.g. Anthropic "
-            "'msg_01abc...'). Same rationale as ``model_id``."
-        ),
+        description=("Mandatory upstream response identifier (e.g. Anthropic 'msg_01abc...'). Same rationale as ``model_id``."),
     )
     ts: Timestamp = Field(default_factory=now_timestamp, description="Wall-clock time emitted.")
 
@@ -301,8 +292,7 @@ class Verdict(_StrictModel):
     corrects: UUID | None = Field(
         default=None,
         description=(
-            "If this verdict corrects a prior one, the prior verdict's UUID. "
-            "Corrections are new events, never in-place mutations (PITFALL #5)."
+            "If this verdict corrects a prior one, the prior verdict's UUID. Corrections are new events, never in-place mutations (PITFALL #5)."
         ),
     )
 
@@ -335,9 +325,7 @@ class Trace(_StrictModel):
     trace_id: UUID = Field(description="Owning trace's UUID.")
     task_id: str = Field(description="Identifier of the task this trace executed.")
     model_id: TypeIdStr = Field(
-        description=(
-            "The model the trace was recorded against. Mismatched replays fail loud (PITFALL #1)."
-        ),
+        description=("The model the trace was recorded against. Mismatched replays fail loud (PITFALL #1)."),
     )
     events: list[Event] = Field(
         default_factory=list,

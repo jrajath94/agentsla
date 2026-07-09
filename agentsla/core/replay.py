@@ -68,10 +68,7 @@ class ToolCallDriftError(Exception):
     def __init__(self, trace_id: UUID, drifts: list[DriftDetail]) -> None:
         self.trace_id = trace_id
         self.drifts = drifts
-        super().__init__(
-            f"trace {trace_id} has {len(drifts)} tool-call drift(s); "
-            f"see .drifts for the per-call detail."
-        )
+        super().__init__(f"trace {trace_id} has {len(drifts)} tool-call drift(s); see .drifts for the per-call detail.")
 
 
 class DriftDetail(BaseModel):
@@ -143,9 +140,7 @@ class ReplayEngine:
         without unwinding the exception). In tolerant mode, drifts are
         silently recorded.
         """
-        normalized_mode: Literal["strict", "tolerant"] = (
-            mode.value if isinstance(mode, ReplayMode) else mode
-        )
+        normalized_mode: Literal["strict", "tolerant"] = mode.value if isinstance(mode, ReplayMode) else mode
 
         with TraceReader(self.db_path) as reader:
             trace = reader.read_trace(trace_id)

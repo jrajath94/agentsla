@@ -17,11 +17,11 @@ from agentsla.classify.classifier import (
 )
 from agentsla.classify.heuristics import HEURISTIC_TRIGGERS
 from agentsla.classify.judge import (
+    PROMPT_HASH,
+    PROMPT_VERSION,
     ClaudeJudge,
     Judge,
     JudgeResult,
-    PROMPT_HASH,
-    PROMPT_VERSION,
     StubJudge,
     should_invoke_judge,
     summarise_events_for_judge,
@@ -40,33 +40,28 @@ from agentsla.classify.taxonomy import (
 )
 
 __all__ = [
-    # Taxonomy
     "CATEGORY_ORDER",
     "CATEGORY_SEVERITY",
-    "FailureCategory",
-    "rank",
-    # Heuristics
     "HEURISTIC_TRIGGERS",
-    # Judge
-    "ClaudeJudge",
-    "Judge",
-    "JudgeResult",
     "PROMPT_HASH",
     "PROMPT_VERSION",
-    "StubJudge",
-    "should_invoke_judge",
-    "summarise_events_for_judge",
-    # Classifier
     "ClassificationResult",
     "Classifier",
+    "ClaudeJudge",
+    "FailureCategory",
     "HeuristicContext",
     "InMemoryLabelSink",
     "JsonlLabelSink",
+    "Judge",
+    "JudgeResult",
     "LabelSink",
-    "agreement",
-    # Metrics
     "MetricsBundle",
+    "StubJudge",
+    "agreement",
     "build_metrics",
     "on_classify_callback",
     "on_verdict_callback",
+    "rank",
+    "should_invoke_judge",
+    "summarise_events_for_judge",
 ]

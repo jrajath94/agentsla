@@ -143,14 +143,7 @@ def test_pan_luhn_invalidation_skips_hit(base_policy: Policy) -> None:
 
 
 def test_rewrite_severity_marks_payload(base_policy: Policy) -> None:
-    policy = base_policy.model_copy(
-        update={
-            "egress_rules": [
-                rule.model_copy(update={"severity": "rewrite"})
-                for rule in base_policy.egress_rules
-            ]
-        }
-    )
+    policy = base_policy.model_copy(update={"egress_rules": [rule.model_copy(update={"severity": "rewrite"}) for rule in base_policy.egress_rules]})
     gate = PolicyGate(policy)
     d = gate.on_tool_call(_make_call(tool="fetch", args={"data": "ssn=123-45-6789"}))
     assert d.allow is True

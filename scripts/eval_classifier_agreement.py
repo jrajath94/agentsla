@@ -32,7 +32,6 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from agentsla.classify import (  # noqa: E402
     Classifier,
-    FailureCategory,
     InMemoryLabelSink,
     StubJudge,
     agreement,
@@ -126,11 +125,11 @@ def main() -> int:
         print("Run scripts/build_classify_dataset.py first.", file=sys.stderr)
         return 2
 
-    rows = [json.loads(l) for l in DATASET_PATH.read_text().splitlines() if l.strip()]
+    rows = [json.loads(line) for line in DATASET_PATH.read_text().splitlines() if line.strip()]
     print(f"Loaded {len(rows)} hand-labelled traces from {DATASET_PATH}")
 
     sink = InMemoryLabelSink()
-    classifier = Classifier(judge=StubJudge(), sink=sink)
+    Classifier(judge=StubJudge(), sink=sink)  # constructs but unused — kept for parity with bench wiring
 
     predicted: list[str] = []
     gold: list[str] = []
@@ -154,7 +153,7 @@ def main() -> int:
 
     overall = agreement(predicted, gold)
     print()
-    print(f"Overall agreement: {overall:.2%} ({sum(p == g for p, g in zip(predicted, gold))}/{len(gold)})")
+    print(f"Overall agreement: {overall:.2%} ({sum(p == g for p, g in zip(predicted, gold, strict=True))}/{len(gold)})")
     print(f"Threshold: {THRESHOLD:.0%}")
     print()
     print("Per-category agreement:")

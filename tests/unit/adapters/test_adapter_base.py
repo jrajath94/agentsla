@@ -66,21 +66,30 @@ class TestNoOpHooks:
 
     def test_on_tool_result_noop(self) -> None:
         h = NoOpHooks()
-        assert h.on_tool_result(  # type: ignore[arg-type]
-            call=..., result=...
-        ) is None
+        assert (
+            h.on_tool_result(  # type: ignore[arg-type]
+                call=..., result=...
+            )
+            is None
+        )
 
     def test_on_final_answer_noop(self) -> None:
         h = NoOpHooks()
-        assert h.on_final_answer(trace=Trace(
-            trace_id=new_trace_id(),
-            task_id="",
-            model_id="m",
-            events=[],
-            final_answer="",
-            start_ts=now_timestamp(),
-            end_ts=now_timestamp(),
-        ), verdict=None) is None
+        assert (
+            h.on_final_answer(
+                trace=Trace(
+                    trace_id=new_trace_id(),
+                    task_id="",
+                    model_id="m",
+                    events=[],
+                    final_answer="",
+                    start_ts=now_timestamp(),
+                    end_ts=now_timestamp(),
+                ),
+                verdict=None,
+            )
+            is None
+        )
 
 
 class TestProtocolCheck:

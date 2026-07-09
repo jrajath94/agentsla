@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from agentsla.verify import ClaimVerdict, VerificationChain
+from agentsla.verify import VerificationChain
 from agentsla.verify.claims import NumericClaim, extract_numeric_claims
-from agentsla.verify.numeric import NumericVerifier, identity_source
+from agentsla.verify.numeric import NumericVerifier
 
 
 class TestExtract:
@@ -66,9 +66,7 @@ class TestNumericVerifier:
         assert any(c for c in incorrect if c.observed == 42 and c.expected == 100)
 
     def test_tolerance_accepts_close_floats(self) -> None:
-        v = NumericVerifier(
-            source_resolver=lambda _c, _t: 3.1400005, tolerance=1e-4
-        )
+        v = NumericVerifier(source_resolver=lambda _c, _t: 3.1400005, tolerance=1e-4)
         claims = v.verify(trace=None, final_answer="pi=3.14")
         # Both 3.14 (int extract) and 3.14 (float) should be verified within tol.
         assert any(c.status == "verified" for c in claims)
@@ -89,13 +87,7 @@ class TestChain:
         assert result.coverage == 1.0
 
     def test_incorrect_claim_fails_chain(self) -> None:
-        chain = VerificationChain(
-            verifiers=[
-                NumericVerifier(
-                    source_resolver=lambda c, _t: 100, tolerance=0.0
-                )
-            ]
-        )
+        chain = VerificationChain(verifiers=[NumericVerifier(source_resolver=lambda c, _t: 100, tolerance=0.0)])
         result = chain.run(trace=None, final_answer="value=42")
         assert any(c.status == "incorrect" for c in result.claims)
         assert result.passed is False
@@ -109,10 +101,12 @@ def test_seeded_error_50_cases(case: int) -> None:
     # * 20 clean answers — verifier must not flag incorrect (0 false corrections).
     # * 30 injected wrong answers — verifier must flag at least one claim.
     if case < 20:
-        # Correct: claim = source. Use a custom source mapping to the
-        # numeric content of the answer.
+        # Correct: claim = source. Bind `case` via default arg to dodge B023.
         answer = f"value={100 + case}"
-        src = lambda _c, _t: 100 + case
+
+        def src(_c, _t, value=100 + case):
+            return value
+
         v = NumericVerifier(source_resolver=src)
         claims = v.verify(trace=None, final_answer=answer)
         assert not any(c.status == "incorrect" for c in claims)
@@ -120,7 +114,10 @@ def test_seeded_error_50_cases(case: int) -> None:
         # Injected wrong: claim != source.
         wrong_value = case + 1
         answer = f"value={wrong_value}"
-        src = lambda _c, _t: 9999
+
+        def src(_c, _t):
+            return 9999
+
         v = NumericVerifier(source_resolver=src, tolerance=0.0)
         claims = v.verify(trace=None, final_answer=answer)
         assert any(c.status == "incorrect" for c in claims)
@@ -134,17 +131,13 @@ def test_seeded_summary() -> None:
     for case in range(50):
         if case < 20:
             answer = f"value={100 + case}"
-            claims = NumericVerifier(
-                source_resolver=lambda _c, _t: 100 + case
-            ).verify(trace=None, final_answer=answer)
+            claims = NumericVerifier(source_resolver=lambda _c, _t, value=100 + case: value).verify(trace=None, final_answer=answer)
             if any(c.status == "incorrect" for c in claims):
                 false_corrections += 1
         else:
             total_wrong += 1
             answer = f"value={case + 1}"
-            claims = NumericVerifier(
-                source_resolver=lambda _c, _t: 9999, tolerance=0.0
-            ).verify(trace=None, final_answer=answer)
+            claims = NumericVerifier(source_resolver=lambda _c, _t: 9999, tolerance=0.0).verify(trace=None, final_answer=answer)
             if any(c.status == "incorrect" for c in claims):
                 caught += 1
     assert caught / total_wrong >= 0.90, f"caught {caught}/{total_wrong}"

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -19,9 +18,7 @@ from agentsla.classify import (
 )
 from tests.unit.classify._fixtures import (
     make_tool_call,
-    make_tool_result,
     make_trace,
-    make_verdict,
 )
 
 
@@ -83,7 +80,7 @@ class TestJsonlSink:
         sink.append({"trace_id": "t1", "category": "hallucinated_fact"})
         sink.append({"trace_id": "t2", "category": "none"})
         content = (tmp_path / "labels.jsonl").read_text()
-        lines = [json.loads(l) for l in content.strip().splitlines()]
+        lines = [json.loads(line) for line in content.strip().splitlines()]
         assert lines[0]["trace_id"] == "t1"
         assert lines[1]["category"] == "none"
 

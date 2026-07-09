@@ -1,7 +1,7 @@
 """30 bench tasks across financial_ops / incident_triage / doc_qa.
 
 Each task is a small dataclass; ``agentsla-bench`` loads them via
-:func:`load_tasks` and runs each through {naked, wrapped} × 5 seeds.
+:func:`load_tasks` and runs each through {naked, wrapped} x 5 seeds.
 
 Distribution: 30 tasks, 8 per domain + 6 holdouts (≥25% holdout ratio
 satisfies the PITFALL #9 mitigation). Each task carries:

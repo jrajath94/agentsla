@@ -219,13 +219,13 @@ def _run_trial(
             captured_trace: Trace | None = None
             captured_result: object = None
 
-            def on_tool_call(self, call: ToolCall) -> HookDecision:  # noqa: ARG002
+            def on_tool_call(self, call: ToolCall) -> HookDecision:
                 return HookDecision(allow=True)
 
-            def on_tool_result(self, call: ToolCall, result: ToolResult) -> None:  # noqa: ARG002
+            def on_tool_result(self, call: ToolCall, result: ToolResult) -> None:
                 return None
 
-            def on_final_answer(self, trace: Trace, verdict: Verdict | None) -> None:  # noqa: ARG002
+            def on_final_answer(self, trace: Trace, verdict: Verdict | None) -> None:
                 self.captured_trace = trace
                 self.captured_result = chain.run(trace, trace.final_answer)
 
@@ -334,9 +334,14 @@ def _summarize(pct: float, rows: list[TrialRow]) -> StrategySummary:
     n = len(by_pct)
     if n == 0:
         return StrategySummary(
-            strategy_pct=pct, n_trials=0,
-            n_perturbed=0, n_caught=0, sensitivity=0.0,
-            n_unperturbed=0, n_clean_verified=0, specificity=0.0,
+            strategy_pct=pct,
+            n_trials=0,
+            n_perturbed=0,
+            n_caught=0,
+            sensitivity=0.0,
+            n_unperturbed=0,
+            n_clean_verified=0,
+            specificity=0.0,
             mean_latency_ms=0.0,
         )
     if pct == 0.0:
@@ -404,11 +409,7 @@ def render_seeded_errors_section(
     md += "|-------------:|---------:|--------------------------:"
     md += "|-------------------------:|------------------:|\n"
     for s in summaries:
-        md += (
-            f"| ±{s.strategy_pct:.1f}% | {s.n_trials} | "
-            f"{s.sensitivity:.0%} | {s.specificity:.0%} | "
-            f"{s.mean_latency_ms:.2f} |\n"
-        )
+        md += f"| ±{s.strategy_pct:.1f}% | {s.n_trials} | {s.sensitivity:.0%} | {s.specificity:.0%} | {s.mean_latency_ms:.2f} |\n"
     md += "\n**Acceptance** (per `feedback.md` Item 3):\n"
     md += "- sensitivity @ ±50% perturbation ≥ 85%\n"
     md += "- specificity @ 0% perturbation ≥ 90%\n"
@@ -460,13 +461,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print("\nSummary:")
     for s in summaries:
-        print(
-            f"  ±{s.strategy_pct:5.1f}%  "
-            f"n={s.n_trials}  "
-            f"sens={s.sensitivity:.0%}  "
-            f"spec={s.specificity:.0%}  "
-            f"mean_lat={s.mean_latency_ms:.2f}ms"
-        )
+        print(f"  ±{s.strategy_pct:5.1f}%  n={s.n_trials}  sens={s.sensitivity:.0%}  spec={s.specificity:.0%}  mean_lat={s.mean_latency_ms:.2f}ms")
 
     section_md = render_seeded_errors_section(summaries, source_parquet=args.out)
     if args.report_section_out:

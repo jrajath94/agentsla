@@ -251,11 +251,7 @@ class RawLoopAdapter(AgentAdapter):
         # ----- 7. final assistant ModelMessage -----
         # Concatenate raw tool output (its own encoding if any). Avoids
         # double-encoding when the tool already returned a JSON string.
-        final_text = (
-            self.echo_model.complete(user_text=self.task_text)
-            + "::"
-            + (tool_output if isinstance(tool_output, str) else str(tool_output))
-        )
+        final_text = self.echo_model.complete(user_text=self.task_text) + "::" + (tool_output if isinstance(tool_output, str) else str(tool_output))
         final = ModelMessage(
             msg_id=uuid4(),
             trace_id=trace_id,

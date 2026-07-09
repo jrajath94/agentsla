@@ -6,8 +6,6 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
-import pytest
-
 from agentsla.classify.heuristics import (
     HEURISTIC_TRIGGERS,
     trigger_budget_exceeded,
@@ -187,10 +185,7 @@ class TestBudgetExceeded:
 class TestPermissionDenied:
     def test_threshold_reached(self) -> None:
         trace = make_trace(events=[])
-        assert (
-            trigger_permission_denied(trace, deny_counts={"fetch": 3})
-            is FailureCategory.PERMISSION_DENIED
-        )
+        assert trigger_permission_denied(trace, deny_counts={"fetch": 3}) is FailureCategory.PERMISSION_DENIED
 
     def test_below_threshold(self) -> None:
         trace = make_trace(events=[])
@@ -201,10 +196,7 @@ class TestRetryLoop:
     def test_three_identical(self) -> None:
         tid = uuid4()
         # Three calls with identical (tool, args) → same canonical hash.
-        events = [
-            make_tool_call(tid, i, tool="fetch", args={"q": "x"}, call_id=uuid4())
-            for i in range(3)
-        ]
+        events = [make_tool_call(tid, i, tool="fetch", args={"q": "x"}, call_id=uuid4()) for i in range(3)]
         trace = make_trace(events=events)
         assert trigger_retry_loop(trace) is FailureCategory.RETRY_LOOP
 
@@ -222,10 +214,7 @@ class TestRetryLoop:
 class TestPolicyViolation:
     def test_egress_hit(self) -> None:
         trace = make_trace(events=[])
-        assert (
-            trigger_policy_violation(trace, egress_hits=["AKIA..."])
-            is FailureCategory.POLICY_VIOLATION
-        )
+        assert trigger_policy_violation(trace, egress_hits=["AKIA..."]) is FailureCategory.POLICY_VIOLATION
 
     def test_no_hit(self) -> None:
         trace = make_trace(events=[])
@@ -282,11 +271,6 @@ class TestIntegration:
     """End-to-end check that all 14 triggers are reachable through HEURISTIC_TRIGGERS."""
 
     def test_all_triggers_iterate(self) -> None:
-        tid = uuid4()
-        events = [
-            make_tool_call(tid, 0, tool="fetch", args={"q": "x"}),
-            make_tool_result(tid, 1, call_id=events_for_iter()[0], result={"ok": True}),
-        ] if False else []  # placeholder to satisfy linters
         trace = make_trace(events=[], final_answer="hello world")
         results = []
         for trig in HEURISTIC_TRIGGERS:

@@ -26,7 +26,6 @@ from typing import Any, Protocol
 
 from agentsla.classify.taxonomy import FailureCategory
 
-
 # ---------------------------------------------------------------------------
 # Prompt template — versioned + content-hash-pinned.
 # ---------------------------------------------------------------------------
@@ -164,9 +163,7 @@ class ClaudeJudge:
         try:
             from anthropic import Anthropic
         except ImportError as e:  # pragma: no cover
-            raise RuntimeError(
-                "ClaudeJudge requires the `anthropic` package; install with `uv add anthropic`"
-            ) from e
+            raise RuntimeError("ClaudeJudge requires the `anthropic` package; install with `uv add anthropic`") from e
 
         client = Anthropic(api_key=self.api_key) if self.api_key else Anthropic()
         prompt = _JUDGE_PROMPT_TEMPLATE.format(
@@ -182,9 +179,7 @@ class ClaudeJudge:
             messages=[{"role": "user", "content": prompt}],
         )
         # First text block
-        raw = "".join(
-            block.text for block in message.content if getattr(block, "type", None) == "text"
-        ).strip()
+        raw = "".join(block.text for block in message.content if getattr(block, "type", None) == "text").strip()
         return _parse_judge_response(raw, prompt_hash=PROMPT_HASH)
 
 
@@ -228,11 +223,7 @@ def should_invoke_judge(
     """
     if not heuristic_candidates:
         return True
-    if (
-        FailureCategory.HALLUCINATED_FACT in heuristic_candidates
-        and heuristic_confidence < 0.7
-        and verification_incorrect > 0
-    ):
+    if FailureCategory.HALLUCINATED_FACT in heuristic_candidates and heuristic_confidence < 0.7 and verification_incorrect > 0:
         return True
     return False
 
@@ -255,11 +246,11 @@ def summarise_events_for_judge(events: list[Any]) -> str:
 
 
 __all__ = [
+    "PROMPT_HASH",
+    "PROMPT_VERSION",
     "ClaudeJudge",
     "Judge",
     "JudgeResult",
-    "PROMPT_HASH",
-    "PROMPT_VERSION",
     "StubJudge",
     "should_invoke_judge",
     "summarise_events_for_judge",

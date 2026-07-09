@@ -123,9 +123,7 @@ class TraceWriter:
         assert self._con is not None
         self._con.close()
         rotation_stamp = int(self.db_path.stat().st_mtime)
-        target = self.db_path.with_name(
-            f"{self.db_path.name}.rotated-{rotation_stamp}"
-        )
+        target = self.db_path.with_name(f"{self.db_path.name}.rotated-{rotation_stamp}")
         shutil.move(str(self.db_path), str(target))
         self._open()
 
@@ -161,9 +159,7 @@ class TraceWriter:
         # Re-validate through the discriminated-union: this guarantees the
         # ``kind`` field is one of the four literal values, so the reader can
         # dispatch without further checks.
-        validated: ToolCall | ToolResult | ModelMessage | Verdict = (
-            _EVENT_TYPE_ADAPTER.validate_python(event.model_dump(mode="json"))
-        )
+        validated: ToolCall | ToolResult | ModelMessage | Verdict = _EVENT_TYPE_ADAPTER.validate_python(event.model_dump(mode="json"))
         payload_json = validated.model_dump(mode="json")
         row = (
             str(validated.trace_id),
@@ -200,10 +196,8 @@ class TraceWriter:
             raise RuntimeError("TraceWriter is closed")
         out_path = Path(out_path)
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        append_clause = ' ,APPEND' if mode == 'append' else ''
-        self._con.execute(
-            f"COPY events TO '{out_path.as_posix()}' (FORMAT PARQUET{append_clause})"
-        )
+        append_clause = " ,APPEND" if mode == "append" else ""
+        self._con.execute(f"COPY events TO '{out_path.as_posix()}' (FORMAT PARQUET{append_clause})")
 
     # ----- accessors used by the bench CLI -----
 
@@ -289,7 +283,7 @@ class TraceReader:
             """
         ).fetchall()
         summaries: list[_TraceSummary] = []
-        for (tid_str, start_ts, end_ts, count) in rows:
+        for tid_str, start_ts, end_ts, count in rows:
             summaries.append(
                 _TraceSummary(
                     trace_id=UUID(tid_str),

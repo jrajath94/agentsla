@@ -48,9 +48,7 @@ class BudgetExceededError(Exception):
         ceiling: float,
         level: DegradationLevel,
     ) -> None:
-        super().__init__(
-            f"budget breach: {metric} observed={observed:.4f} ceiling={ceiling:.4f} level={level.value}"
-        )
+        super().__init__(f"budget breach: {metric} observed={observed:.4f} ceiling={ceiling:.4f} level={level.value}")
         self.metric = metric
         self.observed = observed
         self.ceiling = ceiling
@@ -177,9 +175,7 @@ class BudgetManager:
     def _check_wall_time(self, trace_id: str, latency_ms: float) -> None:
         ceiling = self.spec.max_wall_time.total_seconds() * 1000.0
         if self._started is not None:
-            elapsed = (
-                datetime.now(tz=UTC) - self._started
-            ).total_seconds() * 1000.0
+            elapsed = (datetime.now(tz=UTC) - self._started).total_seconds() * 1000.0
             # Use the larger of (elapsed wall, reported tool latency) so
             # downstream tools can't underreport and bypass the ceiling.
             observed = max(elapsed, latency_ms)

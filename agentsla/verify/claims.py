@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import ast
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -63,7 +63,7 @@ _KIND_BY_PATTERN: list[tuple[str, re.Pattern[str]]] = [
 # multipliers — see ``docs/failure-modes.md § 6``.
 _RANGE_PATTERN = re.compile(
     r"(?:\$|€|£|¥)?\s*-?\d+(?:[\.,]\d+)?"
-    r"\s*(?:-|–|—|\bto\b)\s*"
+    r"\s*(?:-|–|—|\bto\b)\s*"  # noqa: RUF001 — en-dash is a valid range separator
     r"(?:\$|€|£|¥)?\s*(?:(?<!-)-)?\d+(?:[\.,]\d+)?"
 )
 
@@ -100,9 +100,7 @@ def extract_numeric_claims(text: str) -> list[NumericClaim]:
         low, high = _parse_range(match.group(0))
         if low is None or high is None:
             continue
-        claims.append(
-            NumericClaim(text=match.group(0), value=(low, high), kind="range", span=span)
-        )
+        claims.append(NumericClaim(text=match.group(0), value=(low, high), kind="range", span=span))
 
     # Arithmetic expressions: a span of digits/operators + parens between
     # two claim boundaries. Cheap heuristic — parsed via :mod:`ast`.
@@ -111,9 +109,7 @@ def extract_numeric_claims(text: str) -> list[NumericClaim]:
             continue
         seen_spans.add(span)
         snippet = text[span[0] : span[1]]
-        claims.append(
-            NumericClaim(text=snippet, value=snippet.strip(), kind="expression", span=span)
-        )
+        claims.append(NumericClaim(text=snippet, value=snippet.strip(), kind="expression", span=span))
 
     claims.sort(key=lambda c: c.span[0])
     return claims
@@ -184,9 +180,7 @@ def _parse_range(raw: str) -> tuple[float | None, float | None]:
     return nums[0], nums[1]
 
 
-_EXPR_PATTERN = re.compile(
-    r"\b(?:\d+(?:\.\d+)?\s*[+\-*/]\s*)+\d+(?:\.\d+)?\b|\(\s*\d+(?:\.\d+)?\s*[+\-*/]\s*\d+(?:\.\d+)?\s*\)"
-)
+_EXPR_PATTERN = re.compile(r"\b(?:\d+(?:\.\d+)?\s*[+\-*/]\s*)+\d+(?:\.\d+)?\b|\(\s*\d+(?:\.\d+)?\s*[+\-*/]\s*\d+(?:\.\d+)?\s*\)")
 
 
 def _find_expression_spans(text: str) -> list[tuple[int, int]]:

@@ -31,11 +31,7 @@ def _aggregate(rows: list[dict]) -> dict[str, float]:
     success_rate = sum(1 for r in rows if r["success"]) / n
     verified_pct = sum(1 for r in rows if r["verified"]) / n
     inj_runs = [r for r in rows if r["has_injection"]]
-    injection_resistance = (
-        sum(1 for r in inj_runs if r["injection_resisted"]) / len(inj_runs)
-        if inj_runs
-        else 1.0
-    )
+    injection_resistance = sum(1 for r in inj_runs if r["injection_resisted"]) / len(inj_runs) if inj_runs else 1.0
     latencies = sorted(r["latency_ms"] for r in rows)
     p95 = latencies[int(0.95 * (n - 1))]
     mean = sum(latencies) / n
@@ -50,23 +46,16 @@ def _aggregate(rows: list[dict]) -> dict[str, float]:
 
 
 def _markdown_table(naked: dict, wrapped: dict) -> str:
-    overhead_pct = (
-        (wrapped["p95_latency_ms"] - naked["p95_latency_ms"]) / naked["p95_latency_ms"]
-        if naked["p95_latency_ms"]
-        else 0.0
-    )
+    overhead_pct = (wrapped["p95_latency_ms"] - naked["p95_latency_ms"]) / naked["p95_latency_ms"] if naked["p95_latency_ms"] else 0.0
     overhead_abs = wrapped["p95_latency_ms"] - naked["p95_latency_ms"]
     lines = [
         "| Metric | Naked | Wrapped | Delta |",
         "|--------|------:|--------:|------:|",
-        f"| Success rate | {naked['success_rate']:.0%} | {wrapped['success_rate']:.0%} | "
-        f"{(wrapped['success_rate'] - naked['success_rate']):+.0%} |",
-        f"| Verified % | {naked['verified_pct']:.0%} | {wrapped['verified_pct']:.0%} | "
-        f"{(wrapped['verified_pct'] - naked['verified_pct']):+.0%} |",
+        f"| Success rate | {naked['success_rate']:.0%} | {wrapped['success_rate']:.0%} | {(wrapped['success_rate'] - naked['success_rate']):+.0%} |",
+        f"| Verified % | {naked['verified_pct']:.0%} | {wrapped['verified_pct']:.0%} | {(wrapped['verified_pct'] - naked['verified_pct']):+.0%} |",
         f"| Injection resistance | {naked['injection_resistance']:.0%} | {wrapped['injection_resistance']:.0%} | "
         f"{(wrapped['injection_resistance'] - naked['injection_resistance']):+.0%} |",
-        f"| p95 latency (ms) | {naked['p95_latency_ms']:.2f} | {wrapped['p95_latency_ms']:.2f} | "
-        f"{overhead_abs:+.2f} ({overhead_pct:+.1%}) |",
+        f"| p95 latency (ms) | {naked['p95_latency_ms']:.2f} | {wrapped['p95_latency_ms']:.2f} | {overhead_abs:+.2f} ({overhead_pct:+.1%}) |",
         f"| Mean latency (ms) | {naked['mean_latency_ms']:.2f} | {wrapped['mean_latency_ms']:.2f} | "
         f"{(wrapped['mean_latency_ms'] - naked['mean_latency_ms']):+.2f} |",
         f"| N runs | {int(naked['n'])} | {int(wrapped['n'])} | — |",

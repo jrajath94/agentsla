@@ -9,14 +9,14 @@ Anything in this module is part of the public surface — re-exported from
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 
 class Verifier(Protocol):
     """Single claim source: returns a list of :class:`ClaimVerdict`."""
 
-    def verify(self, trace: Any, final_answer: str) -> list["ClaimVerdict"]: ...
+    def verify(self, trace: Any, final_answer: str) -> list[ClaimVerdict]: ...
 
 
 @dataclass

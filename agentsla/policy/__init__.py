@@ -1,4 +1,3 @@
-from agentsla.policy.egress import TypeIdStr  # noqa: F401, used downstream
 """Policy package: pre-execution enforcement for tool-calling agents.
 
 Two contracts:
@@ -18,7 +17,7 @@ regex pack is the documented set; users can extend via
 from agentsla.policy.egress import EgressRule, TypeIdStr, default_egress_rules
 from agentsla.policy.gate import PolicyGate
 from agentsla.policy.loader import load_policy
-from agentsla.policy.schema import Policy, ToolRule, TypeIdStr
+from agentsla.policy.schema import Policy, ToolRule
 
 __all__ = [
     "EgressRule",

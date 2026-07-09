@@ -46,9 +46,7 @@ def build_metrics(registry: Any = None) -> MetricsBundle:
     collisions on the default global registry.
     """
     if Counter is None:  # pragma: no cover
-        raise RuntimeError(
-            "prometheus_client not installed; install with `uv add prometheus-client`"
-        )
+        raise RuntimeError("prometheus_client not installed; install with `uv add prometheus-client`")
     kwargs = {"registry": registry} if registry is not None else {}
     return MetricsBundle(
         failures_total=Counter(

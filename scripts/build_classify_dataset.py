@@ -374,21 +374,21 @@ def build_dataset() -> list[dict]:
     ds: list[dict] = []
     # 14 categories + success = 15 buckets. 100 / 15 ≈ 6.67; distribute
     # to land at exactly 100 with the wider buckets slightly bigger.
-    ds.extend(_success_traces(7))               # 7
-    ds.extend(_hallucinated_traces(7))          # 7
-    ds.extend(_tool_call_error_traces(7))       # 7
-    ds.extend(_retry_loop_traces(7))            # 7
-    ds.extend(_timeout_traces(6))               # 6
-    ds.extend(_permission_denied_traces(7))     # 7
-    ds.extend(_policy_violation_traces(7))      # 7
-    ds.extend(_budget_exceeded_traces(6))       # 6
-    ds.extend(_reasoning_error_traces(7))       # 7
-    ds.extend(_planning_error_traces(7))        # 7
+    ds.extend(_success_traces(7))  # 7
+    ds.extend(_hallucinated_traces(7))  # 7
+    ds.extend(_tool_call_error_traces(7))  # 7
+    ds.extend(_retry_loop_traces(7))  # 7
+    ds.extend(_timeout_traces(6))  # 6
+    ds.extend(_permission_denied_traces(7))  # 7
+    ds.extend(_policy_violation_traces(7))  # 7
+    ds.extend(_budget_exceeded_traces(6))  # 6
+    ds.extend(_reasoning_error_traces(7))  # 7
+    ds.extend(_planning_error_traces(7))  # 7
     ds.extend(_tool_response_misuse_traces(6))  # 6
     ds.extend(_unexpected_tool_failure_traces(6))  # 6
-    ds.extend(_partial_completion_traces(6))    # 6
-    ds.extend(_format_violation_traces(7))      # 7
-    ds.extend(_context_overflow_traces(7))      # 7
+    ds.extend(_partial_completion_traces(6))  # 6
+    ds.extend(_format_violation_traces(7))  # 7
+    ds.extend(_context_overflow_traces(7))  # 7
     assert len(ds) == 100, f"dataset must be 100, got {len(ds)}"
     labels = {d["category"] for d in ds}
     assert len(labels) == 15, f"expected 15 distinct labels (14 + none), got {labels}"

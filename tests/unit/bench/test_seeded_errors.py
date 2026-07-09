@@ -210,9 +210,7 @@ def test_render_seeded_errors_section_mentions_acceptance() -> None:
     assert "85%" in md
 
 
-def test_report_appends_seeded_section_when_parquet_present(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_report_appends_seeded_section_when_parquet_present(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """When ``seeded_errors.parquet`` sits next to ``results.parquet``,
     ``agentsla report`` must append the seeded-error section.
     """

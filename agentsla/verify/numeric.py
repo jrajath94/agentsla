@@ -16,14 +16,15 @@ recompute are flagged ``incorrect`` (the verifier "caught" the error).
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
-from agentsla.verify.base import ClaimVerdict, Verifier
+from agentsla.verify.base import ClaimVerdict
 from agentsla.verify.claims import NumericClaim, extract_numeric_claims
-
 
 # Default relative tolerance for float comparison.
 DEFAULT_TOLERANCE = 1e-6
+
 
 # Default source resolver: identity (claim value IS the source value).
 def identity_source(claim: NumericClaim, trace: Any) -> Any | None:
@@ -65,9 +66,7 @@ class NumericVerifier:
 
     def _judge(self, claim: NumericClaim, source: Any | None) -> ClaimVerdict:
         if source is None:
-            return ClaimVerdict(
-                claim=claim.text, status="unverified", observed=claim.value, expected=None
-            )
+            return ClaimVerdict(claim=claim.text, status="unverified", observed=claim.value, expected=None)
         # Range claims: ``verified`` iff ``source`` lies inside the
         # claimed interval (inclusive). Otherwise ``incorrect``.
         if claim.kind == "range" and isinstance(claim.value, tuple) and len(claim.value) == 2:

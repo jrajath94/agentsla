@@ -17,8 +17,6 @@ from __future__ import annotations
 import argparse
 import sys
 
-import pytest
-
 # Importing the harness module spawns its module-level Prometheus singletons.
 # That is fine inside the test process (it does not bind any port).
 from agentsla.bench.harness import main as bench_main
@@ -65,8 +63,8 @@ def test_metrics_addr_default_is_loopback() -> None:
 
 def test_metrics_addr_explicit_override() -> None:
     """Operator can opt-in to a non-loopback bind (e.g., on a trusted scrape host)."""
-    ns = _parse(["--metrics-port", "9090", "--metrics-addr", "0.0.0.0"])
-    assert ns.metrics_addr == "0.0.0.0"
+    ns = _parse(["--metrics-port", "9090", "--metrics-addr", "0.0.0.0"])  # noqa: S104
+    assert ns.metrics_addr == "0.0.0.0"  # noqa: S104
 
 
 def test_bench_main_callable() -> None:

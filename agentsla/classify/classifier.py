@@ -20,10 +20,11 @@ from __future__ import annotations
 
 import inspect
 import json
-from dataclasses import asdict, dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 from agentsla.classify.heuristics import HEURISTIC_TRIGGERS
 from agentsla.classify.judge import (
@@ -124,11 +125,7 @@ class Classifier:
                 # "threshold_bytes": ...}``) without each trigger having
                 # to declare ``**_``.
                 sig = inspect.signature(trigger)
-                kwargs = {
-                    k: v
-                    for k, v in self.heuristic_context.items()
-                    if k in sig.parameters
-                }
+                kwargs = {k: v for k, v in self.heuristic_context.items() if k in sig.parameters}
                 result = trigger(trace, **kwargs)
             except TypeError:
                 # Trigger does not accept the current context — skip silently.
@@ -196,12 +193,12 @@ def agreement(predicted: list[str], gold: list[str]) -> float:
         raise ValueError("length mismatch")
     if not predicted:
         return 1.0
-    return sum(1 for p, g in zip(predicted, gold) if p == g) / len(predicted)
+    return sum(1 for p, g in zip(predicted, gold, strict=True) if p == g) / len(predicted)
 
 
 __all__ = [
-    "Classifier",
     "ClassificationResult",
+    "Classifier",
     "HeuristicContext",
     "InMemoryLabelSink",
     "JsonlLabelSink",

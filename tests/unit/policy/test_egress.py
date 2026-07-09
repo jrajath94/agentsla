@@ -48,8 +48,6 @@ def test_pan_luhn_detects_valid_card() -> None:
     assert pan_pat.search("5500000000000004 visa-mc"), "valid mc should match"
 
 
-
-
 def test_luhn_helper_known_values() -> None:
     assert luhn_valid("4111111111111111") is True
     assert luhn_valid("4111111111111112") is False

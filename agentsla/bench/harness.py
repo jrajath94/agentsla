@@ -1,4 +1,4 @@
-"""Bench harness — runs ``{naked, wrapped} × tasks × seeds`` and writes
+"""Bench harness — runs ``{naked, wrapped} x tasks x seeds`` and writes
 ``results.parquet``.
 
 The harness is hermetic: it uses :class:`EchoModel` + :class:`JsonEchoTool`
@@ -23,12 +23,10 @@ Output schema (parquet):
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from uuid import uuid4
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -48,7 +46,6 @@ from agentsla.policy import Policy, PolicyGate
 from agentsla.policy.egress import EgressRule, default_egress_rules
 from agentsla.tools.deterministic import JsonEchoTool
 from agentsla.verify import NumericVerifier, VerificationChain, identity_source
-
 
 # ---------------------------------------------------------------------------
 # Module-level singletons
@@ -259,8 +256,13 @@ def _aggregate(rows: list[BenchRow], *, mode: str) -> BenchAggregate:
     n = len(by_mode)
     if n == 0:
         return BenchAggregate(
-            mode=mode, n_runs=0, success_rate=0.0, verified_pct=0.0,
-            injection_resistance=0.0, p95_latency_ms=0.0, mean_latency_ms=0.0,
+            mode=mode,
+            n_runs=0,
+            success_rate=0.0,
+            verified_pct=0.0,
+            injection_resistance=0.0,
+            p95_latency_ms=0.0,
+            mean_latency_ms=0.0,
         )
     success_rate = sum(1 for r in by_mode if r.success) / n
     verified_pct = sum(1 for r in by_mode if r.verified) / n
@@ -325,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
             # which would expose failure metrics to anything reachable on the developer's LAN.
             # Bind loopback by default; require an explicit --metrics-addr opt-in for anything else.
             metrics_server = start_http_server(args.metrics_port, addr=args.metrics_addr)
-            print(f"Prometheus /metrics serving on {args.metrics_addr}:{args.metrics_port}")
+            print(f"Prometheus /metrics serving on {metrics_server.server_address}")
         except ImportError as exc:  # pragma: no cover — optional dep
             print(
                 f"WARNING: --metrics-port requested but prometheus_client not available ({exc}); skipping",
@@ -359,10 +361,14 @@ def main(argv: list[str] | None = None) -> int:
     naked = _aggregate(rows, mode="naked")
     wrapped = _aggregate(rows, mode="wrapped")
     print("\nAggregate (naked vs wrapped):")
-    print(f"  naked : success={naked.success_rate:.0%} verified={naked.verified_pct:.0%} "
-          f"inj_resist={naked.injection_resistance:.0%} p95={naked.p95_latency_ms:.2f}ms mean={naked.mean_latency_ms:.2f}ms")
-    print(f"  wrapped: success={wrapped.success_rate:.0%} verified={wrapped.verified_pct:.0%} "
-          f"inj_resist={wrapped.injection_resistance:.0%} p95={wrapped.p95_latency_ms:.2f}ms mean={wrapped.mean_latency_ms:.2f}ms")
+    print(
+        f"  naked : success={naked.success_rate:.0%} verified={naked.verified_pct:.0%} "
+        f"inj_resist={naked.injection_resistance:.0%} p95={naked.p95_latency_ms:.2f}ms mean={naked.mean_latency_ms:.2f}ms"
+    )
+    print(
+        f"  wrapped: success={wrapped.success_rate:.0%} verified={wrapped.verified_pct:.0%} "
+        f"inj_resist={wrapped.injection_resistance:.0%} p95={wrapped.p95_latency_ms:.2f}ms mean={wrapped.mean_latency_ms:.2f}ms"
+    )
     # Latency overhead (vs naked).
     overhead = ((wrapped.p95_latency_ms - naked.p95_latency_ms) / naked.p95_latency_ms) if naked.p95_latency_ms else 0.0
     print(f"  p95 latency overhead (wrapped - naked): {overhead:+.1%}")

@@ -75,7 +75,7 @@ packages = ["agentsla"]
 [tool.ruff]
 # Project lint policy (LINT-01): zero findings on `ruff check`, zero diffs on
 # `ruff format --check`. Pinned config; bump versions in lock only.
-line-length = 110
+line-length = 150
 target-version = "py311"
 extend-exclude = [
   "build",

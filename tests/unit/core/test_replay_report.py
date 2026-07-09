@@ -228,10 +228,7 @@ def test_replay_preserves_original_final_answer(tmp_path: Path) -> None:
     # update needed for plan 01.4: the reader returns a Trace that we patch).
     # We patch the stored store via a separate UPDATE here is overkill; instead
     # we just confirm that running 5 replays returns identical report bytes.
-    reports = [
-        replay(tid, path, mode=ReplayMode.STRICT).model_dump_json()
-        for _ in range(5)
-    ]
+    reports = [replay(tid, path, mode=ReplayMode.STRICT).model_dump_json() for _ in range(5)]
     assert len(set(reports)) == 1
 
 

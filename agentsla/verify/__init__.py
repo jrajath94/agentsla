@@ -23,7 +23,7 @@ __all__ = [
     "ChainResult",
     "ClaimVerdict",
     "NumericVerifier",
-    "Verifier",
     "VerificationChain",
+    "Verifier",
     "identity_source",
 ]

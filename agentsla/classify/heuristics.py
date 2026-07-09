@@ -25,7 +25,6 @@ from typing import Any
 from agentsla.classify.taxonomy import FailureCategory
 from agentsla.core.events import ToolCall, ToolResult, Trace, Verdict
 
-
 # Default context-window size in bytes for ``context_overflow`` trigger.
 # Models we target default to 200 KiB raw text; this is the conservative
 # upper bound for tool-call-rich traces.
@@ -110,7 +109,6 @@ def trigger_tool_response_misuse(trace: Trace) -> FailureCategory | None:
     results = _tool_results(trace)
     if not results:
         return None
-    calls = _tool_calls(trace)
     error_indices = [i for i, ev in enumerate(trace.events) if isinstance(ev, ToolResult) and ev.error]
     if not error_indices:
         return None
@@ -181,9 +179,7 @@ def trigger_context_overflow(trace: Trace, *, threshold_bytes: int = DEFAULT_CON
     return None
 
 
-def trigger_budget_exceeded(
-    trace: Trace, *, budget_exhausted: bool = False, **_: Any
-) -> FailureCategory | None:
+def trigger_budget_exceeded(trace: Trace, *, budget_exhausted: bool = False, **_: Any) -> FailureCategory | None:
     """A BudgetManager.exhausted event is present.
 
     The orchestrator passes ``budget_exhausted`` through heuristic_context;
@@ -198,7 +194,7 @@ def trigger_permission_denied(
     """Same DENY decision ≥threshold times for the same tool name."""
     if not deny_counts:
         return None
-    for tool, count in deny_counts.items():
+    for _tool_name, count in deny_counts.items():
         if count >= threshold:
             return FailureCategory.PERMISSION_DENIED
     return None
@@ -210,7 +206,9 @@ def trigger_retry_loop(trace: Trace, *, threshold: int = RETRY_LOOP_THRESHOLD) -
     if len(calls) < threshold:
         return None
     consecutive = 1
-    for prev, curr in zip(calls, calls[1:]):
+    from itertools import pairwise
+
+    for prev, curr in pairwise(calls):
         if prev.tool == curr.tool and _args_hash(prev) == _args_hash(curr):
             consecutive += 1
             if consecutive >= threshold:

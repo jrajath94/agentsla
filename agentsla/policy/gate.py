@@ -82,13 +82,9 @@ class PolicyGate:
             try:
                 import json
 
-                import jsonschema  # noqa: F401
+                import jsonschema
 
-                schema = (
-                    per_tool.json_schema
-                    if isinstance(per_tool.json_schema, dict)
-                    else json.loads(per_tool.json_schema)
-                )
+                schema = per_tool.json_schema if isinstance(per_tool.json_schema, dict) else json.loads(per_tool.json_schema)
                 jsonschema.validate(instance=call.args, schema=schema)
             except ImportError:  # pragma: no cover — jsonschema is optional
                 pass
@@ -147,9 +143,7 @@ class PolicyGate:
 
     def _deny(self, call: ToolCall, *, reason: str) -> HookDecision:
         decision = HookDecision(allow=False, reason=reason)
-        self._audit.append(
-            {"trace": str(call.trace_id), "tool": call.tool, "decision": "deny", "reason": reason}
-        )
+        self._audit.append({"trace": str(call.trace_id), "tool": call.tool, "decision": "deny", "reason": reason})
         return decision
 
     def _allow(
