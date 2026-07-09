@@ -5,8 +5,10 @@ number from ``results.parquet``; ``agentsla report`` turns that parquet
 into the headline table.
 """
 
-from agentsla.bench.harness import BenchAggregate, BenchRow, main as bench_main
+from agentsla.bench.harness import BenchAggregate, BenchRow
+from agentsla.bench.harness import main as bench_main
 from agentsla.bench.report import main as report_main
+from agentsla.bench.seeded_errors import main as seeded_main
 from agentsla.bench.tasks import BenchTask, holdout_tasks, load_tasks, stats
 
 __all__ = [
@@ -17,5 +19,6 @@ __all__ = [
     "holdout_tasks",
     "load_tasks",
     "report_main",
+    "seeded_main",
     "stats",
 ]

@@ -116,6 +116,40 @@ def main(argv: list[str] | None = None) -> int:
         agg = _aggregate(subset)
         md += f"| {mode} | {int(agg['n'])} | {agg['success_rate']:.0%} | {agg['verified_pct']:.0%} | {agg['p95_latency_ms']:.2f} |\n"
 
+    # Optional: append seeded-error section if the parquet exists alongside
+    # the main results parquet. Keeps ``report`` deterministic — no re-run of
+    # the experiment; we read the parquet written by ``agentsla bench-seeded-errors``.
+    seeded_path = args.in_path.parent / "seeded_errors.parquet"
+    if seeded_path.exists():
+        from agentsla.bench.seeded_errors import (
+            _summarize,
+            render_seeded_errors_section,
+        )
+
+        seeded_table = pq.read_table(seeded_path)
+        seeded_rows = seeded_table.to_pylist()
+        # Rebuild TrialRow-like dicts; _summarize only needs status + strategy_pct + latency_ms.
+        from dataclasses import dataclass
+
+        @dataclass
+        class _LightRow:
+            strategy_pct: float
+            status: str
+            latency_ms: float
+
+        light = [
+            _LightRow(
+                strategy_pct=float(r["strategy_pct"]),
+                status=str(r["status"]),
+                latency_ms=float(r["latency_ms"]),
+            )
+            for r in seeded_rows
+        ]
+        # One summary per unique strategy.
+        unique = sorted({r.strategy_pct for r in light})
+        summaries = [_summarize(p, light) for p in unique]
+        md += "\n" + render_seeded_errors_section(summaries, source_parquet=seeded_path)
+
     if args.out:
         args.out.write_text(md, encoding="utf-8")
         print(f"Wrote report to {args.out}")
