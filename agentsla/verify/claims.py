@@ -50,10 +50,21 @@ _KIND_BY_PATTERN: list[tuple[str, re.Pattern[str]]] = [
 # "100-150". Suffix multipliers (4.2M-4.5M) are intentionally not
 # supported here — the parser stays narrow; per-endpoint multipliers
 # would inflate false-positive risk on date/phone spans.
+#
+# Security note: the second half's sign is gated by ``(?:\s*-)?``,
+# requiring a whitespace boundary before the optional sign. This blocks
+# the semantic-escape case "4--5" → (4, -5): the first dash is the
+# separator, and without this anchor the second dash would slide into
+# the second number's optional sign, producing a range with a negative
+# high endpoint that downstream verifiers treat as legitimate.
+# Whitespace-separated signs (``-4 to -5``) still match because the
+# ``\s*`` between the separator and the second half consumes the
+# boundary. The pattern is also intentionally narrow on suffix
+# multipliers — see ``docs/failure-modes.md § 6``.
 _RANGE_PATTERN = re.compile(
-    r"(?:\$|€|£|¥)?\s?-?\d+(?:[\.,]\d+)?"
+    r"(?:\$|€|£|¥)?\s*-?\d+(?:[\.,]\d+)?"
     r"\s*(?:-|–|—|\bto\b)\s*"
-    r"(?:\$|€|£|¥)?\s?-?\d+(?:[\.,]\d+)?"
+    r"(?:\$|€|£|¥)?\s*(?:(?<!-)-)?\d+(?:[\.,]\d+)?"
 )
 
 
@@ -130,9 +141,25 @@ def _parse_range(raw: str) -> tuple[float | None, float | None]:
     """Split ``"$4.2-$4.5"`` → ``(4.2, 4.5)``.
 
     Currency symbols are stripped; commas inside numbers are removed.
-    Returns ``(None, None)`` if the input cannot be parsed.
+    Returns ``(None, None)`` if the input cannot be parsed, including:
+
+      * either endpoint is empty / non-numeric after currency stripping
+      * both endpoints parse to the same value (likely a typo, not a
+        range — e.g., ``"4-4"`` is more reliably parsed as a single
+        int claim elsewhere in the pipeline)
+
+    Note: ``raw`` is stripped first. The matcher above may capture
+    leading whitespace (e.g., ``" -4 to -5"``), and without stripping
+    the internal split regex would treat that whitespace as a second
+    separator boundary, producing 4 parts instead of 2.
     """
-    parts = re.split(r"\s*(?:-|–|—|\bto\b)\s*", raw)
+    raw = raw.strip()
+    # Two-alternative split: a digit-anchored dash (the common ``4-5`` /
+    # ``100-150`` case) OR whitespace-anchored ``to``. A plain
+    # ``\s*-\s*`` alternative would also match the leading sign dash
+    # in ``-4 to -5``, producing 4 parts; the digit lookbehind gates
+    # the dash split to "this dash is between two numbers".
+    parts = re.split(r"(?<=\d)\s*-\s*|\s+to\s+", raw)
     if len(parts) != 2:
         return None, None
     nums: list[float] = []
@@ -145,6 +172,13 @@ def _parse_range(raw: str) -> tuple[float | None, float | None]:
             nums.append(float(cleaned))
         except ValueError:
             return None, None
+    # Degenerate range: low == high is almost always a parse artifact
+    # (a single value accidentally matched the range pattern, like
+    # ``"4-4"``). Returning None here forces the caller's `if low is
+    # None or high is None` branch to skip emission, instead of letting
+    # the claim silently verify as "any source in [4, 4]".
+    if nums[0] == nums[1]:
+        return None, None
     if nums[0] > nums[1]:
         nums[0], nums[1] = nums[1], nums[0]
     return nums[0], nums[1]

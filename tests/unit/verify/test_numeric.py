@@ -203,3 +203,63 @@ def test_range_incorrect_when_source_outside() -> None:
     verdicts = v.verify(trace=None, final_answer="Revenue approx $4.2-$4.5.")
     ranges = [r for r in verdicts if r.claim and "$4.2-$4.5" in r.claim]
     assert any(r.status == "incorrect" for r in ranges)
+
+
+# Range-parser hardening (background security review finding
+# parser-differential-semantic-escape). These tests pin the new
+# behavior so a future refactor that loosens the regex or _parse_range
+# validation surfaces here, not silently in production.
+
+
+def test_range_rejects_double_dash_semantic_escape() -> None:
+    """``4--5`` must NOT parse as ``(4, -5)``.
+
+    Without the lookbehind-gated sign in _RANGE_PATTERN's second half,
+    the separator dash would absorb one ``-`` and the second ``-``
+    would slip into the second number's optional sign. A regression
+    here would silently inject negative-endpoint ranges into the
+    verifier.
+    """
+    claims = extract_numeric_claims("Value 4--5 here.")
+    ranges = [c for c in claims if c.kind == "range"]
+    assert ranges == [], f"double-dash must not parse as range; got {ranges}"
+
+
+def test_range_rejects_degenerate_low_equal_high() -> None:
+    """``4-4`` is a likely typo, not a range.
+
+    The int claim ``4`` still emits from a separate pattern, but the
+    range emitter must skip the degenerate (4.0, 4.0) tuple.
+    """
+    claims = extract_numeric_claims("Value 4-4 stable.")
+    ranges = [c for c in claims if c.kind == "range"]
+    assert ranges == [], f"degenerate range must not emit; got {ranges}"
+
+
+def test_range_still_accepts_negative_endpoints() -> None:
+    """Explicitly-signed negative ranges (``-4 to -5``) still work.
+
+    The security fix only blocks ``4--5`` (separator glued to sign). A
+    whitespace-separated sign like ``-4 to -5`` is a legitimate range.
+    """
+    claims = extract_numeric_claims("Window: -4 to -5 units.")
+    ranges = [c for c in claims if c.kind == "range"]
+    assert len(ranges) == 1
+    low, high = ranges[0].value
+    assert low == -5.0
+    assert high == -4.0
+
+
+def test_range_still_accepts_standard_forms() -> None:
+    """The hardening must not break the common cases the v0.1 ships."""
+    cases = [
+        ("Revenue $4.2-$4.5.", (4.2, 4.5)),
+        ("Q1: 100-150 units.", (100.0, 150.0)),
+        ("Range 3.5 to 4.0.", (3.5, 4.0)),
+    ]
+    for text, expected in cases:
+        claims = extract_numeric_claims(text)
+        ranges = [c for c in claims if c.kind == "range"]
+        assert len(ranges) == 1, f"expected one range in {text!r}, got {ranges}"
+        low, high = ranges[0].value
+        assert (low, high) == expected, f"for {text!r}: expected {expected}, got {(low, high)}"
