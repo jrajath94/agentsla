@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from agentsla.verify.base import InternalClaimVerdict, Verifier
 from agentsla.verify.chain import ChainResult, VerificationChain
+from agentsla.verify.gate import GateResult, VerificationGate
 from agentsla.verify.numeric import (
     DEFAULT_TOLERANCE,
     NumericVerifier,
@@ -21,9 +22,11 @@ from agentsla.verify.numeric import (
 __all__ = [
     "DEFAULT_TOLERANCE",
     "ChainResult",
+    "GateResult",
     "InternalClaimVerdict",
     "NumericVerifier",
     "VerificationChain",
+    "VerificationGate",
     "Verifier",
     "identity_source",
 ]

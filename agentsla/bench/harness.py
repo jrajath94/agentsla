@@ -45,7 +45,12 @@ from agentsla.core.trace import TraceWriter
 from agentsla.policy import Policy, PolicyGate
 from agentsla.policy.egress import EgressRule, default_egress_rules
 from agentsla.tools.deterministic import JsonEchoTool
-from agentsla.verify import NumericVerifier, VerificationChain, identity_source
+from agentsla.verify import (
+    NumericVerifier,
+    VerificationChain,
+    VerificationGate,
+    identity_source,
+)
 
 # ---------------------------------------------------------------------------
 # Module-level singletons
@@ -112,6 +117,9 @@ class WrappedHooks(RuntimeHooks):
         # ---- Verifier (Phase 3) ----
         self.verifier = NumericVerifier(source_resolver=identity_source)
         self.chain = VerificationChain(verifiers=[self.verifier])
+        # Gate is the typed bridge: chain result → Verdict event appended to writer.
+        # Without this wiring, Verdict rows never reach the trace store (EXECUTION §3 Commit 4).
+        self.verification_gate = VerificationGate(self.chain, self.writer, verifier="composite")
         # ---- Classifier (Phase 4) ----
         sink_path = label_sink_path or _LABEL_SINK_PATH
         self.label_sink = JsonlLabelSink(sink_path)
@@ -142,8 +150,9 @@ class WrappedHooks(RuntimeHooks):
         return None
 
     def on_final_answer(self, trace, verdict):  # type: ignore[override]
-        # 1. Verification chain (Phase 3).
-        result = self.chain.run(trace, trace.final_answer)
+        # 1. Verification gate (Phase 3) — runs chain + appends Verdict event.
+        gate_result = self.verification_gate.run(trace, trace.final_answer)
+        result = gate_result.chain
         self.last_verified = result.passed
         self.last_coverage = result.coverage
         # 2. Classifier (Phase 4) — feeds off the gate's audit log when denied.
