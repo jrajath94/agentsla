@@ -2,7 +2,7 @@
 
 Given a list of :class:`NumericClaim` extracted from the final answer,
 recompute each by replaying the source tool-call against the recorded
-trace; emit a :class:`ClaimVerdict` per claim.
+trace; emit a :class:`InternalClaimVerdict` per claim.
 
 The source resolver is pluggable: callers register a callable that
 takes a ``NumericClaim`` and returns the expected numeric value (or
@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from agentsla.verify.base import ClaimVerdict
+from agentsla.verify.base import InternalClaimVerdict
 from agentsla.verify.claims import NumericClaim, extract_numeric_claims
 
 # Default relative tolerance for float comparison.
@@ -56,10 +56,10 @@ class NumericVerifier:
         self.source_resolver = source_resolver
         self.tolerance = tolerance
 
-    def verify(self, trace: Any, final_answer: str) -> list[ClaimVerdict]:
-        """Extract + recompute; return one :class:`ClaimVerdict` per claim."""
+    def verify(self, trace: Any, final_answer: str) -> list[InternalClaimVerdict]:
+        """Extract + recompute; return one :class:`InternalClaimVerdict` per claim."""
         claims = extract_numeric_claims(final_answer)
-        out: list[ClaimVerdict] = []
+        out: list[InternalClaimVerdict] = []
         for claim in claims:
             source = self.source_resolver(claim, trace)
             verdict = self._judge(claim, source)
@@ -68,9 +68,9 @@ class NumericVerifier:
 
     # ----- internals -----
 
-    def _judge(self, claim: NumericClaim, source: Any | None) -> ClaimVerdict:
+    def _judge(self, claim: NumericClaim, source: Any | None) -> InternalClaimVerdict:
         if source is None:
-            return ClaimVerdict(claim=claim.text, status="unverified", observed=claim.value, expected=None)
+            return InternalClaimVerdict(claim=claim.text, status="unverified", observed=claim.value, expected=None)
         # Range claims: ``verified`` iff ``source`` lies inside the
         # claimed interval (inclusive). Otherwise ``incorrect``.
         if claim.kind == "range" and isinstance(claim.value, tuple) and len(claim.value) == 2:
@@ -79,7 +79,7 @@ class NumericVerifier:
                 inside = low <= float(source) <= high
             except (TypeError, ValueError):
                 inside = False
-            return ClaimVerdict(
+            return InternalClaimVerdict(
                 claim=claim.text,
                 status="verified" if inside else "incorrect",
                 observed=claim.value,
@@ -87,14 +87,14 @@ class NumericVerifier:
                 confidence=1.0,
             )
         if self._values_match(claim.value, source):
-            return ClaimVerdict(
+            return InternalClaimVerdict(
                 claim=claim.text,
                 status="verified",
                 observed=claim.value,
                 expected=source,
                 confidence=1.0,
             )
-        return ClaimVerdict(
+        return InternalClaimVerdict(
             claim=claim.text,
             status="incorrect",
             observed=claim.value,

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from agentsla.verify.base import ClaimVerdict, Verifier
+from agentsla.verify.base import InternalClaimVerdict, Verifier
 
 
 @dataclass
@@ -13,7 +13,7 @@ class ChainResult:
     """Composite result of running multiple verifiers."""
 
     verifiers: list[str]
-    claims: list[ClaimVerdict] = field(default_factory=list)
+    claims: list[InternalClaimVerdict] = field(default_factory=list)
     coverage_threshold: float = 1.0
 
     @property
@@ -54,7 +54,7 @@ class VerificationChain:
         self.coverage_threshold = coverage_threshold
 
     def run(self, trace: Any, final_answer: str) -> ChainResult:
-        claims: list[ClaimVerdict] = []
+        claims: list[InternalClaimVerdict] = []
         names: list[str] = []
         for v in self.verifiers:
             names.append(type(v).__name__)

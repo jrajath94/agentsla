@@ -16,12 +16,23 @@ from typing import Any, Protocol
 class Verifier(Protocol):
     """Single claim source: returns a list of :class:`ClaimVerdict`."""
 
-    def verify(self, trace: Any, final_answer: str) -> list[ClaimVerdict]: ...
+    def verify(self, trace: Any, final_answer: str) -> list[InternalClaimVerdict]: ...
 
 
 @dataclass
-class ClaimVerdict:
-    """Per-claim result."""
+class InternalClaimVerdict:
+    """Per-claim verifier result (internal layer).
+
+    This is the dataclass form produced by verifiers. It is the
+    *internal* representation; the *event* representation lives in
+    :class:`agentsla.core.events.ClaimVerdict` (pydantic) and is built
+    from this one by :class:`agentsla.verify.gate.VerificationGate`
+    before being appended to the trace store.
+
+    Two distinct types live in the codebase by design — the dataclass
+    exists for fast, allocation-cheap verifier pipelines; the pydantic
+    model is what gets persisted to DuckDB and survives round-trips.
+    """
 
     claim: str
     status: str  # "verified" | "incorrect" | "unverified"
@@ -30,4 +41,4 @@ class ClaimVerdict:
     confidence: float = 1.0
 
 
-__all__ = ["ClaimVerdict", "Verifier"]
+__all__ = ["InternalClaimVerdict", "Verifier"]

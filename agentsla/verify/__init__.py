@@ -10,7 +10,7 @@ external claims do not (yet) surface in coverage.
 
 from __future__ import annotations
 
-from agentsla.verify.base import ClaimVerdict, Verifier
+from agentsla.verify.base import InternalClaimVerdict, Verifier
 from agentsla.verify.chain import ChainResult, VerificationChain
 from agentsla.verify.numeric import (
     DEFAULT_TOLERANCE,
@@ -21,7 +21,7 @@ from agentsla.verify.numeric import (
 __all__ = [
     "DEFAULT_TOLERANCE",
     "ChainResult",
-    "ClaimVerdict",
+    "InternalClaimVerdict",
     "NumericVerifier",
     "VerificationChain",
     "Verifier",
