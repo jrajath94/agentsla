@@ -105,24 +105,40 @@ def trigger_tool_call_error(trace: Trace, *, allowed_tools: Iterable[str] | None
 
 
 def trigger_tool_response_misuse(trace: Trace) -> FailureCategory | None:
-    """A ToolResult with error set AND a subsequent ToolCall that does not adapt."""
-    results = _tool_results(trace)
-    if not results:
+    """A ToolResult with error set AND a subsequent ToolCall that reuses the
+    *exact* failing (tool, args) tuple.
+
+    Distinguishes three agent behaviors after an error:
+      * **No followup call** — agent gave up (planning failure, not misuse).
+      * **Adapted call** — different tool OR different args — legitimate
+        recovery. NOT flagged.
+      * **Literal reuse** — same tool AND identical args_hash — the agent
+        is blindly reusing a known-failing call. FLAGGED as
+        ``tool_response_misuse``.
+
+    The naive proxy "any subsequent call = misuse" produced too many
+    false positives on adaptive retries.
+    """
+    if not _tool_results(trace):
         return None
-    error_indices = [i for i, ev in enumerate(trace.events) if isinstance(ev, ToolResult) and ev.error]
-    if not error_indices:
+    if not any(r.error for r in _tool_results(trace)):
         return None
-    # Naive misuse check: any error result AND a ToolCall came AFTER it that
-    # did NOT pass an empty/error sentinel. We use a simple proxy: if any
-    # subsequent ToolCall exists, we flag.
-    for err_idx in error_indices:
-        for j, ev in enumerate(trace.events):
-            if j <= err_idx:
+    call_by_id = {ev.call_id: ev for ev in trace.events if isinstance(ev, ToolCall)}
+    events = trace.events
+    for i, ev in enumerate(events):
+        if not isinstance(ev, ToolResult) or not ev.error:
+            continue
+        failing_call = call_by_id.get(ev.call_id)
+        if failing_call is None:
+            continue
+        for j in range(i + 1, len(events)):
+            nxt = events[j]
+            if not isinstance(nxt, ToolCall):
                 continue
-            if isinstance(ev, ToolCall):
+            if nxt.tool == failing_call.tool and _args_hash(nxt) == _args_hash(failing_call):
                 return FailureCategory.TOOL_RESPONSE_MISUSE
-    # Edge case: error result was the last event — assume agent gave up,
-    # not misuse.
+            # Adapted (different tool or different args) — not misuse.
+            break
     return None
 
 
@@ -137,24 +153,50 @@ def trigger_hallucinated_fact(trace: Trace) -> FailureCategory | None:
 
 
 def trigger_reasoning_error(trace: Trace) -> FailureCategory | None:
-    """A numeric claim in the final answer contradicts another numeric claim."""
+    """Detect a numeric contradiction anchored on a multi-word noun phrase.
+
+    The naive "first-word anchor" rule produced false positives on
+    numbered-step enumerations ("Step 1: get 100. Step 2: get 50.").
+    The reframed rule:
+
+      1. Skip sentences that begin with a step marker (``"1."``, ``"2:"``,
+         ``"3)"``) — these are enumerations, not claims about the same
+         quantity.
+      2. Anchor each sentence on its first two lowercased words (falling
+         back to one word when the sentence is shorter).
+      3. Fire when two sentences share an anchor AND their first numbers
+         differ.
+
+    Examples:
+      * "Total is 100. Total is 50." → anchor "total is", values {100, 50}
+        → REASONING_ERROR.
+      * "Revenue was 100. Profit was 50." → distinct anchors
+        ("revenue was" vs "profit was") → no fire.
+      * "Step 1: get 100. Step 2: get 50." → step-marker sentences skipped
+        → no fire.
+    """
     import re
 
-    nums = re.findall(r"-?\d+(?:\.\d+)?", trace.final_answer or "")
-    if len(nums) < 2:
-        return None
-    # Heuristic: identical claim made with different values is suspicious.
-    # Example: "Total is 100. Total = 50." — same noun, different numbers.
-    sentences = re.split(r"[.!?]\s*", trace.final_answer or "")
-    counts: dict[str, list[float]] = {}
+    text = trace.final_answer or ""
+    sentences = re.split(r"[.!?]\s*", text)
+    nums_re = re.compile(r"-?\d+(?:\.\d+)?")
+    word_re = re.compile(r"[a-zA-Z]+")
+    step_re = re.compile(r"^\s*\w+\s+\d+[.:)]\s*")
+    by_anchor: dict[str, set[float]] = {}
     for sent in sentences:
-        words = re.findall(r"\b([a-zA-Z_]+)\b", sent)
-        n = re.findall(r"-?\d+(?:\.\d+)?", sent)
-        if len(words) >= 1 and len(n) >= 1:
-            anchor = words[0].lower()
-            counts.setdefault(anchor, []).append(float(n[0]))
-    for vals in counts.values():
-        if len(vals) >= 2 and len(set(vals)) > 1:
+        if not sent.strip():
+            continue
+        if step_re.match(sent):
+            # Enumeration ("1. …", "2: …") — skip; not a quantity claim.
+            continue
+        words = word_re.findall(sent)
+        nums = nums_re.findall(sent)
+        if not nums or not words:
+            continue
+        anchor = " ".join(w.lower() for w in words[:2])
+        by_anchor.setdefault(anchor, set()).add(float(nums[0]))
+    for vals in by_anchor.values():
+        if len(vals) >= 2:
             return FailureCategory.REASONING_ERROR
     return None
 

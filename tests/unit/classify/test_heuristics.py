@@ -78,7 +78,20 @@ class TestToolCallError:
 
 
 class TestToolResponseMisuse:
-    def test_error_followed_by_call_detected(self) -> None:
+    def test_literal_reuse_detected(self) -> None:
+        """Agent re-issues the failing call with identical args → misuse."""
+        tid = uuid4()
+        cid = uuid4()
+        events = [
+            make_tool_call(tid, 0, call_id=cid, tool="fetch", args={"q": "x"}),
+            make_tool_result(tid, 1, call_id=cid, error="boom"),
+            make_tool_call(tid, 2, call_id=uuid4(), tool="fetch", args={"q": "x"}),
+        ]
+        trace = make_trace(events=events)
+        assert trigger_tool_response_misuse(trace) is FailureCategory.TOOL_RESPONSE_MISUSE
+
+    def test_adapted_args_pass(self) -> None:
+        """Agent retries with different args → adapted, NOT misuse."""
         tid = uuid4()
         cid = uuid4()
         events = [
@@ -87,7 +100,19 @@ class TestToolResponseMisuse:
             make_tool_call(tid, 2, tool="fetch", args={"q": "again"}),
         ]
         trace = make_trace(events=events)
-        assert trigger_tool_response_misuse(trace) is FailureCategory.TOOL_RESPONSE_MISUSE
+        assert trigger_tool_response_misuse(trace) is None
+
+    def test_adapted_tool_pass(self) -> None:
+        """Agent switches tool after error → adapted, NOT misuse."""
+        tid = uuid4()
+        cid = uuid4()
+        events = [
+            make_tool_call(tid, 0, call_id=cid, tool="fetch", args={"q": "x"}),
+            make_tool_result(tid, 1, call_id=cid, error="boom"),
+            make_tool_call(tid, 2, tool="search", args={"q": "x"}),
+        ]
+        trace = make_trace(events=events)
+        assert trigger_tool_response_misuse(trace) is None
 
     def test_error_with_no_followup(self) -> None:
         tid = uuid4()
@@ -129,6 +154,24 @@ class TestReasoningError:
 
     def test_too_few_numbers(self) -> None:
         trace = make_trace(final_answer="Hello world.")
+        assert trigger_reasoning_error(trace) is None
+
+    def test_numbered_steps_do_not_fire(self) -> None:
+        """Regression: "Step 1: … Step 2: …" enumerations are not contradictions."""
+        trace = make_trace(
+            final_answer="Step 1: get 100. Step 2: get 50. Step 3: get 25."
+        )
+        assert trigger_reasoning_error(trace) is None
+
+    def test_multi_word_anchor_matches(self) -> None:
+        """Anchor covers the first two words; catches "The total is" pattern."""
+        trace = make_trace(
+            final_answer="The total cost is 100. The total cost is 50."
+        )
+        assert trigger_reasoning_error(trace) is FailureCategory.REASONING_ERROR
+
+    def test_distinct_two_word_anchors_do_not_fire(self) -> None:
+        trace = make_trace(final_answer="Revenue grew 100. Profit grew 50.")
         assert trigger_reasoning_error(trace) is None
 
 
