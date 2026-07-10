@@ -40,8 +40,12 @@ bench = [
   "rich==15.0.0",
 ]
 # v0.2: matplotlib-driven figures for REPORT.md + README (figures CLI).
+# numpy pinned <2 because matplotlib's transitive numpy>=2.5 stub uses Python
+# 3.12 syntax that mypy on Python 3.11 cannot parse; numpy 1.26 ships
+# 3.11-compatible stubs and is the last stable 1.x line.
 figures = [
   "matplotlib==3.10.7",
+  "numpy<2.0",
 ]
 # Test-only dependencies. Kept separate from [project.dependencies] so `pip install agentsla`
 # does not pull pytest/hypothesis into runtime installs.

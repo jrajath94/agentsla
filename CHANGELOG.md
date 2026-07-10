@@ -120,6 +120,10 @@ without API keys or GPU.
 |---|------|---------|
 | 1 | 8e8fb94 | test(policy): property-based invariants for PolicyGate |
 | 2 | (this commit) | chore(release): bump 0.1.0.dev0 → 0.2.0.dev0 + CHANGELOG v0.2 section |
+| 3 | 7f8cf7c | feat(core): trace schema versioning + upgrade scaffold |
+| 4 | 737b80a | feat(bench): cross-adapter parity bench + REPORT.md parity section |
+| 5 | 0d61e73 | feat(bench): matplotlib figures CLI + REPORT.md auto-include |
+| 6 | 38cc8d5 | feat(classify): held-out classifier evaluation CLI + REPORT.md section |
 
 ### Out of scope (still deferred, or newly so)
 
