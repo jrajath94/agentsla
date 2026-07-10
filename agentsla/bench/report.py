@@ -215,6 +215,23 @@ def main(argv: list[str] | None = None) -> int:
     if parity_path.exists():
         md += "\n" + _render_parity_section(parity_path)
 
+    # Optional: append figures section if ``figures/`` directory contains PNGs.
+    # Source of truth for figures = ``bench/figures.py`` (CLI ``agentsla bench-figures``).
+    figures_dir = args.in_path.parent / "figures"
+    if figures_dir.is_dir():
+        from agentsla.bench.figures import render_figures_section
+
+        pngs = sorted(figures_dir.glob("*.png"))
+        if pngs:
+            md += "\n" + render_figures_section(pngs)
+
+    # Optional: append held-out classifier eval section if
+    # ``eval_classifier.md`` exists adjacent. Source of truth for the eval
+    # = ``bench/eval_classifier.py`` (CLI ``agentsla eval-classifier``).
+    eval_path = args.in_path.parent / "eval_classifier.md"
+    if eval_path.exists():
+        md += "\n" + eval_path.read_text(encoding="utf-8")
+
     if args.out:
         args.out.write_text(md, encoding="utf-8")
         print(f"Wrote report to {args.out}")
