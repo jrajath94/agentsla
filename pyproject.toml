@@ -39,6 +39,10 @@ bench = [
   "typer==0.26.8",
   "rich==15.0.0",
 ]
+# v0.2: matplotlib-driven figures for REPORT.md + README (figures CLI).
+figures = [
+  "matplotlib==3.10.7",
+]
 # Test-only dependencies. Kept separate from [project.dependencies] so `pip install agentsla`
 # does not pull pytest/hypothesis into runtime installs.
 test = [
@@ -51,7 +55,7 @@ test = [
 # `agentsla[all]` pulls every adapter + the bench surface — convenient for the
 # one-command repo repro target (`uv sync --extra all`) while staying optional.
 all = [
-  "agentsla[claude,langgraph,metrics,bench,test]",
+  "agentsla[claude,langgraph,metrics,bench,figures,test]",
 ]
 
 [project.scripts]

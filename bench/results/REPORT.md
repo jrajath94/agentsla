@@ -46,3 +46,25 @@ _Generated from `bench/results/parity.parquet`._
 **Event-count agreement:** 100%
 
 Event-kind sequence equality is enforced by the unit suite (`tests/integration/test_cross_adapter_parity.py`); this section surfaces the parity evidence at the bench scale.
+
+## Figures
+
+### Cost Per Task
+
+![Cost Per Task](figures/cost_per_task.png)
+
+### Gate Passed
+
+![Gate Passed](figures/gate_passed.png)
+
+### Injection Resistance
+
+![Injection Resistance](figures/injection_resistance.png)
+
+### Latency Cdf
+
+![Latency Cdf](figures/latency_cdf.png)
+
+### Success Rate
+
+![Success Rate](figures/success_rate.png)
