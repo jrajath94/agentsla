@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -88,6 +89,73 @@ def _markdown_table(naked: dict, wrapped: dict) -> str:
     return "\n".join(lines)
 
 
+def _render_seeded_section(seeded_path: Path) -> str:
+    """Render the seeded-errors section from ``seeded_errors.parquet``.
+
+    Kept as a helper so the optional auto-include stays one block.
+    """
+    from agentsla.bench.seeded_errors import (
+        _summarize,
+        render_seeded_errors_section,
+    )
+
+    seeded_table = pq.read_table(seeded_path)
+    seeded_rows = seeded_table.to_pylist()
+
+    @dataclass
+    class _LightRow:
+        strategy_pct: float
+        status: str
+        latency_ms: float
+
+    light = [
+        _LightRow(
+            strategy_pct=float(r["strategy_pct"]),
+            status=str(r["status"]),
+            latency_ms=float(r["latency_ms"]),
+        )
+        for r in seeded_rows
+    ]
+    unique = sorted({r.strategy_pct for r in light})
+    summaries = [_summarize(p, light) for p in unique]
+    return render_seeded_errors_section(summaries, source_parquet=seeded_path)
+
+
+def _render_parity_section(parity_path: Path) -> str:
+    """Render the cross-adapter parity section from ``parity.parquet``."""
+    from agentsla.bench.parity import _aggregate_parity, render_parity_section
+
+    parity_table = pq.read_table(parity_path)
+    parity_rows = parity_table.to_pylist()
+
+    @dataclass
+    class _LightRow:
+        adapter: str
+        task_id: str
+        seed: int
+        success: bool
+        n_events: int
+        n_allow: int
+        n_deny: int
+        latency_ms: float
+
+    light = [
+        _LightRow(
+            adapter=str(r["adapter"]),
+            task_id=str(r["task_id"]),
+            seed=int(r["seed"]),
+            success=bool(r["success"]),
+            n_events=int(r["n_events"]),
+            n_allow=int(r["n_allow"]),
+            n_deny=int(r["n_deny"]),
+            latency_ms=float(r["latency_ms"]),
+        )
+        for r in parity_rows
+    ]
+    agg = _aggregate_parity(light)
+    return render_parity_section(agg, source_parquet=parity_path)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="agentsla-report", description="Generate bench report from parquet.")
     parser.add_argument("--in", dest="in_path", type=Path, default=Path("bench/results/results.parquet"), help="Input parquet.")
@@ -139,34 +207,13 @@ def main(argv: list[str] | None = None) -> int:
     # the experiment; we read the parquet written by ``agentsla bench-seeded-errors``.
     seeded_path = args.in_path.parent / "seeded_errors.parquet"
     if seeded_path.exists():
-        from agentsla.bench.seeded_errors import (
-            _summarize,
-            render_seeded_errors_section,
-        )
+        md += "\n" + _render_seeded_section(seeded_path)
 
-        seeded_table = pq.read_table(seeded_path)
-        seeded_rows = seeded_table.to_pylist()
-        # Rebuild TrialRow-like dicts; _summarize only needs status + strategy_pct + latency_ms.
-        from dataclasses import dataclass
-
-        @dataclass
-        class _LightRow:
-            strategy_pct: float
-            status: str
-            latency_ms: float
-
-        light = [
-            _LightRow(
-                strategy_pct=float(r["strategy_pct"]),
-                status=str(r["status"]),
-                latency_ms=float(r["latency_ms"]),
-            )
-            for r in seeded_rows
-        ]
-        # One summary per unique strategy.
-        unique = sorted({r.strategy_pct for r in light})
-        summaries = [_summarize(p, light) for p in unique]
-        md += "\n" + render_seeded_errors_section(summaries, source_parquet=seeded_path)
+    # Optional: append cross-adapter parity section if ``parity.parquet`` exists.
+    # Source of truth for parity = ``bench/parity.py`` (CLI ``agentsla bench-parity``).
+    parity_path = args.in_path.parent / "parity.parquet"
+    if parity_path.exists():
+        md += "\n" + _render_parity_section(parity_path)
 
     if args.out:
         args.out.write_text(md, encoding="utf-8")

@@ -31,3 +31,18 @@ _Generated from `bench/results/results.parquet`._
 |------|--:|--------:|------------:|---------------:|---------:|
 | naked | 16 | 100% | 0% | n/a | 6.00 |
 | wrapped | 16 | 88% | 100% | n/a | 8.69 |
+
+## Cross-adapter parity (rawloop vs langgraph)
+
+_Generated from `bench/results/parity.parquet`._
+
+| Adapter | N | Successes | Mean events/run | Mean latency (ms) |
+|---------|--:|----------:|----------------:|------------------:|
+| rawloop | 30 | 30 | 4.00 | 7.71 |
+| langgraph | 30 | 30 | 4.00 | 8.23 |
+
+**Paired runs:** 30
+**Success agreement:** 100%
+**Event-count agreement:** 100%
+
+Event-kind sequence equality is enforced by the unit suite (`tests/integration/test_cross_adapter_parity.py`); this section surfaces the parity evidence at the bench scale.
