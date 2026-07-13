@@ -177,6 +177,28 @@ def main(argv: list[str] | None = None) -> int:
 
     md = "# AgentSLA bench report\n\n"
     md += f"_Generated from `{args.in_path}`._\n\n"
+    # Honest-gap callout: when no row in the parquet declares a ground_truth
+    # substring (the EchoModel bench never does), verified_at_truth is None
+    # for every aggregate. Surface this so a reviewer who opens the headline
+    # table sees the gap AND the fix, not just "n/a". PRD-v1 § 2.1 F3:
+    # "v1 must answer yes, with measured numbers — or surface the honest gap."
+    if naked["verified_at_truth"] is None and wrapped["verified_at_truth"] is None:
+        md += (
+            "> **Honest gap — `verified_at_truth` not measured.**\n"
+            "> The hermetic `EchoModel` self-certifies but does not declare\n"
+            "> task ground truths, so no run can be checked against truth.\n"
+            "> To populate this column, run:\n"
+            "> ```\n"
+            "> ANTHROPIC_API_KEY=sk-... \\\n"
+            ">   python -m agentsla bench-real \\\n"
+            ">     --model claude-haiku-4-5-20251001 \\\n"
+            ">     --tasks-per-domain 5 \\\n"
+            ">     --out bench/results/real_llm.parquet\n"
+            "> ```\n"
+            "> The harness path, tests, and CLI are real (see\n"
+            "> `agentsla/bench/real_llm.py` + `tests/unit/bench/test_real_llm.py`);\n"
+            "> only the live numbers are missing.\n\n"
+        )
     md += "## Headline: naked vs wrapped\n\n"
     md += _markdown_table(naked, wrapped) + "\n\n"
     md += "## Per-domain breakdown\n\n"

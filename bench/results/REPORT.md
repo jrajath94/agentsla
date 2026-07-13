@@ -2,6 +2,21 @@
 
 _Generated from `bench/results/results.parquet`._
 
+> **Honest gap — `verified_at_truth` not measured.**
+> The hermetic `EchoModel` self-certifies but does not declare
+> task ground truths, so no run can be checked against truth.
+> To populate this column, run:
+> ```
+> ANTHROPIC_API_KEY=sk-... \
+>   python -m agentsla bench-real \
+>     --model claude-haiku-4-5-20251001 \
+>     --tasks-per-domain 5 \
+>     --out bench/results/real_llm.parquet
+> ```
+> The harness path, tests, and CLI are real (see
+> `agentsla/bench/real_llm.py` + `tests/unit/bench/test_real_llm.py`);
+> only the live numbers are missing.
+
 ## Headline: naked vs wrapped
 
 | Metric | Naked | Wrapped | Delta |

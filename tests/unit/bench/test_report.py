@@ -142,3 +142,40 @@ class TestReportCli:
         assert rc == 2
         captured = capsys.readouterr()  # type: ignore[attr-defined]
         assert "Run `agentsla bench --all`" in captured.err
+
+    def test_honest_gap_banner_appears_when_no_ground_truth(self, tmp_path: Path) -> None:
+        """Both modes have verified_at_truth=None → banner surfaces the gap
+        AND the fix command. Without this, a reviewer opening REPORT.md sees
+        `verified_at_truth: n/a` in every cell but not the why/how.
+        """
+        parquet = tmp_path / "results.parquet"
+        rows = [_row(mode="naked"), _row(mode="wrapped", verified=True)]
+        _write_parquet(parquet, rows)
+        out_path = tmp_path / "report.md"
+        rc = report_main(["--in", str(parquet), "--out", str(out_path)])
+        assert rc == 0
+        text = out_path.read_text(encoding="utf-8")
+        assert "Honest gap" in text, "banner must surface the gap name so CI grep can lock it in"
+        assert "verified_at_truth" in text
+        assert "ANTHROPIC_API_KEY" in text, "banner must name the fix command's env var"
+        assert "bench-real" in text, "banner must name the fix subcommand"
+        # The banner must appear ABOVE the headline table — reviewer reads it first.
+        assert text.index("Honest gap") < text.index("Headline: naked vs wrapped"), (
+            "banner must precede the headline table so the gap is seen before the numbers"
+        )
+
+    def test_honest_gap_banner_absent_when_ground_truth_present(self, tmp_path: Path) -> None:
+        """At least one row with verified_at_truth=True → banner must NOT appear
+        (the column is then honest about what it measured, not a gap).
+        """
+        parquet = tmp_path / "results.parquet"
+        rows = [
+            _row(mode="naked", verified=True, verified_at_truth=True),
+            _row(mode="wrapped", verified=True, verified_at_truth=False),
+        ]
+        _write_parquet(parquet, rows)
+        out_path = tmp_path / "report.md"
+        rc = report_main(["--in", str(parquet), "--out", str(out_path)])
+        assert rc == 0
+        text = out_path.read_text(encoding="utf-8")
+        assert "Honest gap" not in text, "banner must not appear when verified_at_truth is measurable — would falsely claim a gap"
