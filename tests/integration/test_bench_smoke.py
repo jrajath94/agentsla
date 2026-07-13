@@ -57,9 +57,7 @@ def test_bench_writes_parquet_with_headline_columns(tmp_path: Path) -> None:
         ],
         cwd=tmp_path,
     )
-    assert result.returncode == 0, (
-        f"bench CLI must exit 0; got {result.returncode}. stderr={result.stderr!r}"
-    )
+    assert result.returncode == 0, f"bench CLI must exit 0; got {result.returncode}. stderr={result.stderr!r}"
     assert parquet_path.exists(), f"parquet must exist at {parquet_path}"
     assert parquet_path.stat().st_size > 0, "parquet must be non-empty"
 
@@ -105,16 +103,13 @@ def test_report_cli_regenerates_report_with_headline(tmp_path: Path) -> None:
         ["report", "--in", str(parquet_path), "--out", str(report_path)],
         cwd=tmp_path,
     )
-    assert report_result.returncode == 0, (
-        f"report CLI must exit 0; got {report_result.returncode}. stderr={report_result.stderr!r}"
-    )
+    assert report_result.returncode == 0, f"report CLI must exit 0; got {report_result.returncode}. stderr={report_result.stderr!r}"
     assert report_path.exists(), f"REPORT.md must exist at {report_path}"
     report_text = report_path.read_text(encoding="utf-8")
     assert report_text, "REPORT.md must be non-empty"
     # The headline section is the contract for downstream readers.
     assert re.search(r"Headline:.*naked vs wrapped", report_text, re.DOTALL), (
-        "REPORT.md must contain a 'Headline: naked vs wrapped' section so the "
-        "bench surface is honest about what was measured."
+        "REPORT.md must contain a 'Headline: naked vs wrapped' section so the bench surface is honest about what was measured."
     )
 
 
@@ -145,8 +140,7 @@ def test_bench_smoke_full_pipeline_returns_zero(tmp_path: Path) -> None:
     assert bench_result.returncode == 0, bench_result.stderr
     table = pq.read_table(parquet_path)
     assert table.num_rows > 0, (
-        f"bench must produce at least one row at seeds=1; got {table.num_rows}. "
-        "An empty parquet means the task fixtures or harness silently broke."
+        f"bench must produce at least one row at seeds=1; got {table.num_rows}. An empty parquet means the task fixtures or harness silently broke."
     )
 
     report_result = _run_cli(
@@ -157,7 +151,4 @@ def test_bench_smoke_full_pipeline_returns_zero(tmp_path: Path) -> None:
     report_text = report_path.read_text(encoding="utf-8")
     # At minimum, the report must mention naked and wrapped somewhere —
     # otherwise the table is empty / wrong fixture.
-    assert "naked" in report_text and "wrapped" in report_text, (
-        "REPORT.md must mention both naked and wrapped modes so the comparison "
-        "is grounded."
-    )
+    assert "naked" in report_text and "wrapped" in report_text, "REPORT.md must mention both naked and wrapped modes so the comparison is grounded."

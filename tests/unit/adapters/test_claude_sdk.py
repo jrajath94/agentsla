@@ -532,7 +532,7 @@ class TestClaudeSdkEdgeCases:
 
         class _MalformedToolUse:
             kind = "tool_use"
-            input = {"x": 1}
+            input: dict[str, Any] = {"x": 1}  # noqa: RUF012 — test fixture, intentional
 
         final = FakeSdkMessage(kind="text", text="ok", parent_msg_id="msg_1")
         fake = FakeSdkClient([_MalformedToolUse(), final])
