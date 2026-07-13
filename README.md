@@ -58,24 +58,32 @@ pip install -e ".[all]"
 ## Quick Start
 
 ```python
-from agentsla.policy import PolicyGate, PolicyConfig
-from agentsla.verify import VerificationGate
-from agentsla.trace import TraceWriter
+from pathlib import Path
 
-# Set up gates
-policy_config = PolicyConfig(
-    allowed_tools=["web_search", "calculator"],
-    egress_rules=["SSN", "credit_card"]
-)
-policy = PolicyGate(policy_config)
-verifier = VerificationGate()
-trace_writer = TraceWriter("traces.duckdb")
+from agentsla.policy import Policy, PolicyGate
+from agentsla.policy.egress import default_egress_rules
+from agentsla.verify import VerificationChain, NumericVerifier, identity_source
+from agentsla.classify import Classifier, InMemoryLabelSink
+from agentsla.core.trace import TraceWriter, TraceReader
+from agentsla.adapters.rawloop import RawLoopAdapter
+from agentsla.tools.deterministic import JsonEchoTool
 
-# Wrap your agent execution
-response = agent.run(prompt)
-policy.check(response)
-verdict = verifier.check(response)
-trace_writer.log(response, verdict)
+# Build the four guarantees.
+policy = Policy(allowed_tools=["json_echo"], egress_rules=default_egress_rules())
+gate = PolicyGate(policy)
+
+verifier = NumericVerifier(source_resolver=identity_source, tolerance=1e-6)
+chain = VerificationChain(verifiers=[verifier])
+
+sink = InMemoryLabelSink()
+classifier = Classifier(sink=sink)
+
+# Wrap an agent run.
+trace_path = Path("/tmp/agentsla-quickstart.duckdb")
+writer = TraceWriter(trace_path)
+adapter = RawLoopAdapter(tools={"json_echo": JsonEchoTool()}, trace_writer=writer)
+final = adapter.run(task_id="demo", hooks=gate)
+print(final.text)
 ```
 
 ## Authoring a policy
