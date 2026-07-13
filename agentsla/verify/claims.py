@@ -202,7 +202,7 @@ def _parse_range(raw: str) -> tuple[float | None, float | None]:
         return None, None
     if nums[0] > nums[1]:
         nums[0], nums[1] = nums[1], nums[0]
-    return nums[0], nums[1]  # type: ignore[return-value]  # mypy: list items narrowed by try/except above
+    return nums[0], nums[1]  # mypy: list items narrowed by try/except above
 
 
 # Per-endpoint multiplier table for range claims (v1 F7). Pinned to a
