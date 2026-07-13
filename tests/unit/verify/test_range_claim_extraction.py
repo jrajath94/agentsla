@@ -40,16 +40,10 @@ class TestRangeClaimExtraction:
         claims = extract_numeric_claims("Revenue is $4.2M-$4.5M this quarter.")
         ranges = _ranges_only(claims)
 
-        assert len(ranges) == 1, (
-            f"expected exactly one range claim, got {len(ranges)}: {ranges}"
-        )
+        assert len(ranges) == 1, f"expected exactly one range claim, got {len(ranges)}: {ranges}"
         low, high = ranges[0].value
-        assert low == pytest.approx(4_200_000), (
-            f"first endpoint $4.2M must scale to 4_200_000; got {low!r}"
-        )
-        assert high == pytest.approx(4_500_000), (
-            f"second endpoint $4.5M must scale to 4_500_000; got {high!r}"
-        )
+        assert low == pytest.approx(4_200_000), f"first endpoint $4.2M must scale to 4_200_000; got {low!r}"
+        assert high == pytest.approx(4_500_000), f"second endpoint $4.5M must scale to 4_500_000; got {high!r}"
 
     def test_range_claim_handles_currency_mix(self) -> None:
         """Each test text emits a parseable range claim with both endpoints.
@@ -65,12 +59,8 @@ class TestRangeClaimExtraction:
         ):
             claims = extract_numeric_claims(text)
             ranges = _ranges_only(claims)
-            assert len(ranges) == 1, (
-                f"{text!r}: expected one range claim; got {ranges}"
-            )
-            assert ranges[0].value == expected, (
-                f"{text!r}: endpoints {ranges[0].value!r} != {expected!r}"
-            )
+            assert len(ranges) == 1, f"{text!r}: expected one range claim; got {ranges}"
+            assert ranges[0].value == expected, f"{text!r}: endpoints {ranges[0].value!r} != {expected!r}"
 
     def test_range_claim_unchanged_for_simple_range(self) -> None:
         """'4-5' parses as (4.0, 5.0) — no semantic-escape regression.
@@ -82,9 +72,7 @@ class TestRangeClaimExtraction:
         """
         claims = extract_numeric_claims("Value is 4-5 here.")
         ranges = _ranges_only(claims)
-        assert len(ranges) == 1, (
-            f"simple '4-5' must parse as one range; got {ranges}"
-        )
+        assert len(ranges) == 1, f"simple '4-5' must parse as one range; got {ranges}"
         low, high = ranges[0].value
         assert low == pytest.approx(4.0)
         assert high == pytest.approx(5.0)
@@ -99,16 +87,10 @@ class TestRangeClaimExtraction:
         """
         claims = extract_numeric_claims("Forecast $1,200-$1,800 for Q2.")
         ranges = _ranges_only(claims)
-        assert len(ranges) == 1, (
-            f"expected one range claim; got {ranges}"
-        )
+        assert len(ranges) == 1, f"expected one range claim; got {ranges}"
         low, high = ranges[0].value
-        assert low == pytest.approx(1200.0), (
-            f"$1,200 must parse as 1200.0; got {low!r}"
-        )
-        assert high == pytest.approx(1800.0), (
-            f"$1,800 must parse as 1800.0; got {high!r}"
-        )
+        assert low == pytest.approx(1200.0), f"$1,200 must parse as 1200.0; got {low!r}"
+        assert high == pytest.approx(1800.0), f"$1,800 must parse as 1800.0; got {high!r}"
 
     def test_range_claim_still_rejects_double_dash_semantic_escape(self) -> None:
         """Regression guard: '4--5' must NOT parse as (4, -5).
@@ -120,6 +102,4 @@ class TestRangeClaimExtraction:
         """
         claims = extract_numeric_claims("Value 4--5 here.")
         ranges = _ranges_only(claims)
-        assert ranges == [], (
-            f"double-dash '4--5' must not parse as range; got {ranges}"
-        )
+        assert ranges == [], f"double-dash '4--5' must not parse as range; got {ranges}"

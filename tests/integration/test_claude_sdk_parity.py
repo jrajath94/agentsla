@@ -165,8 +165,7 @@ def test_three_way_parity_across_demo_tasks(tmp_path: Path) -> None:
         lg_kinds = _langgraph(task)
 
         assert claude_kinds == raw_kinds == lg_kinds, (
-            f"parity broken for task={task!r}: "
-            f"rawloop={raw_kinds}, langgraph={lg_kinds}, claude_sdk={claude_kinds}"
+            f"parity broken for task={task!r}: rawloop={raw_kinds}, langgraph={lg_kinds}, claude_sdk={claude_kinds}"
         )
         assert claude_kinds == ["model_message", "tool_call", "tool_result", "model_message"]
 

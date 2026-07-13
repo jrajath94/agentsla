@@ -136,10 +136,7 @@ def test_readme_quickstart_prints_final_answer(readme_snippet: str) -> None:
     # FinalAnswer exposes ``text``; printing it must produce a non-empty
     # string for the demo to be informative.
     final_text = getattr(final_obj, "text", "")
-    assert isinstance(final_text, str) and final_text, (
-        "README quickstart `final.text` must be a non-empty string "
-        "(the demo output the user sees)."
-    )
+    assert isinstance(final_text, str) and final_text, "README quickstart `final.text` must be a non-empty string (the demo output the user sees)."
 
 
 def test_readme_quickstart_does_not_import_nonexistent_symbols(readme_snippet: str) -> None:
@@ -151,8 +148,8 @@ def test_readme_quickstart_does_not_import_nonexistent_symbols(readme_snippet: s
     actual cause of the v0.2 footgun.
     """
     forbidden = {
-        "PolicyConfig",       # the real name is Policy
-        "VerificationGate",   # real public symbol is VerificationChain/NumericVerifier
+        "PolicyConfig",  # the real name is Policy
+        "VerificationGate",  # real public symbol is VerificationChain/NumericVerifier
         "from agentsla.trace",  # the real module is agentsla.core.trace
     }
     found = [tok for tok in forbidden if tok in readme_snippet]
@@ -178,7 +175,4 @@ def test_readme_quickstart_references_four_guarantees(readme_snippet: str) -> No
     }
     for guarantee, anchors in expected_anchors.items():
         missing = [a for a in anchors if a not in readme_snippet]
-        assert not missing, (
-            f"README quickstart must reference {anchors!r} "
-            f"(guarantee: {guarantee}); missing: {missing!r}"
-        )
+        assert not missing, f"README quickstart must reference {anchors!r} (guarantee: {guarantee}); missing: {missing!r}"

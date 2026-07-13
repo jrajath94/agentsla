@@ -37,9 +37,7 @@ def test_synthetic_builder_writes_rows_with_synthetic_flag(tmp_path: Path) -> No
     rows = [json.loads(line) for line in out_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert len(rows) == n
     # Every row is synthetic.
-    assert all(r.get("synthetic") is True for r in rows), (
-        "Every synthetic row must carry synthetic=true so eval reports can flag provenance."
-    )
+    assert all(r.get("synthetic") is True for r in rows), "Every synthetic row must carry synthetic=true so eval reports can flag provenance."
     # Every row has a gold_category (the eval's input contract).
     assert all(r.get("gold_category") for r in rows)
 
@@ -89,9 +87,7 @@ def test_real_builder_with_mocked_claude_writes_real_rows(monkeypatch, tmp_path:
     assert n >= 30, f"real builder with mocked Claude should emit >= 30 rows, got {n}"
     rows = [json.loads(line) for line in out_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     # Mocked Claude path: synthetic must be false.
-    assert all(r.get("synthetic") is False for r in rows), (
-        "Real rows must carry synthetic=false so the eval report can mark them as REAL."
-    )
+    assert all(r.get("synthetic") is False for r in rows), "Real rows must carry synthetic=false so the eval report can mark them as REAL."
     # Each row should carry the model id we asked for.
     assert all(r.get("model_id", "").startswith("claude-") for r in rows)
 

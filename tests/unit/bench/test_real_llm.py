@@ -80,12 +80,8 @@ def test_real_llm_emits_not_yet_measured_marker_when_no_key(tmp_path: Path) -> N
         env=env,
         check=False,
     )
-    assert result.returncode == 2, (
-        f"CLI must exit 2 on missing key; got {result.returncode}. stderr={result.stderr!r}"
-    )
-    assert "ANTHROPIC_API_KEY" in result.stderr, (
-        f"stderr must name ANTHROPIC_API_KEY so the user knows what to set. stderr={result.stderr!r}"
-    )
+    assert result.returncode == 2, f"CLI must exit 2 on missing key; got {result.returncode}. stderr={result.stderr!r}"
+    assert "ANTHROPIC_API_KEY" in result.stderr, f"stderr must name ANTHROPIC_API_KEY so the user knows what to set. stderr={result.stderr!r}"
     assert not out_path.exists(), "parquet must not be written when key is missing"
 
 

@@ -294,9 +294,7 @@ def _call_claude(prompt: str, *, model: str, api_key: str | None) -> str:
     avoid coupling the fixture builder to the bench harness)."""
     effective_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
     if not effective_key:
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY required for real held-out fixture (or pass api_key=...)"
-        )
+        raise RuntimeError("ANTHROPIC_API_KEY required for real held-out fixture (or pass api_key=...)")
     try:
         import anthropic  # type: ignore[import-untyped]
     except ImportError as exc:  # pragma: no cover
@@ -329,9 +327,7 @@ def build_real_held_out_fixture(
     has_key = bool(api_key) or bool(os.environ.get("ANTHROPIC_API_KEY"))
     if not has_key:
         if not synthetic_fallback:
-            raise RuntimeError(
-                "ANTHROPIC_API_KEY required for real held-out fixture (or pass synthetic_fallback=True)"
-            )
+            raise RuntimeError("ANTHROPIC_API_KEY required for real held-out fixture (or pass synthetic_fallback=True)")
         # 14 FailureCategory slots x n_per_category → would yield 140 rows.
         # We use the same generators as the synthetic builder (no overlap
         # with heuristics' training triggers) so the eval is honest.
@@ -351,10 +347,7 @@ def build_real_held_out_fixture(
             # to the same task prompt. We synthesize a "prompt" from the
             # task_id and ask Claude to reply with a deterministic answer;
             # the gold_category stays the same so the eval is supervised.
-            prompt = (
-                f"Task: {base.get('task_id', f'real-{gen_idx}-{i}')}. "
-                "Reply briefly with the canonical answer."
-            )
+            prompt = f"Task: {base.get('task_id', f'real-{gen_idx}-{i}')}. Reply briefly with the canonical answer."
             try:
                 text = _call_claude(prompt, model=model, api_key=api_key)
                 base["text"] = text

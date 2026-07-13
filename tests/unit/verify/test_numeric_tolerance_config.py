@@ -47,15 +47,9 @@ class TestNumericVerifierToleranceConfig:
         strict_statuses = {v.status for v in strict_verdicts}
         loose_statuses = {v.status for v in loose_verdicts}
 
-        assert "incorrect" in strict_statuses, (
-            f"strict (1e-6) must reject 1e-4 perturbation; got {strict_verdicts}"
-        )
-        assert "incorrect" not in loose_statuses, (
-            f"loose (1e-2) must accept 1e-4 perturbation; got {loose_verdicts}"
-        )
-        assert "verified" in loose_statuses, (
-            f"loose (1e-2) must verify within tolerance; got {loose_verdicts}"
-        )
+        assert "incorrect" in strict_statuses, f"strict (1e-6) must reject 1e-4 perturbation; got {strict_verdicts}"
+        assert "incorrect" not in loose_statuses, f"loose (1e-2) must accept 1e-4 perturbation; got {loose_verdicts}"
+        assert "verified" in loose_statuses, f"loose (1e-2) must verify within tolerance; got {loose_verdicts}"
 
     def test_numeric_verifier_default_tolerance_is_strict(self) -> None:
         """Default tolerance is ``1e-6`` (regression guard for finops).
@@ -65,12 +59,9 @@ class TestNumericVerifierToleranceConfig:
         loosens the default breaks this test loud.
         """
         verifier = NumericVerifier()
-        assert verifier.tolerance == pytest.approx(1e-6), (
-            f"default tolerance must be 1e-6, got {verifier.tolerance!r}"
-        )
+        assert verifier.tolerance == pytest.approx(1e-6), f"default tolerance must be 1e-6, got {verifier.tolerance!r}"
         assert verifier.tolerance == DEFAULT_TOLERANCE, (
-            f"instance tolerance must equal module DEFAULT_TOLERANCE; "
-            f"got {verifier.tolerance!r} vs {DEFAULT_TOLERANCE!r}"
+            f"instance tolerance must equal module DEFAULT_TOLERANCE; got {verifier.tolerance!r} vs {DEFAULT_TOLERANCE!r}"
         )
 
     def test_numeric_verifier_tolerance_zero_means_exact(self) -> None:
@@ -89,9 +80,7 @@ class TestNumericVerifierToleranceConfig:
 
         # With tolerance=0.0, even a 1e-12 perturbation must be flagged.
         incorrect = [v for v in verdicts if v.status == "incorrect"]
-        assert incorrect, (
-            f"tolerance=0.0 must reject non-exact float; got {verdicts}"
-        )
+        assert incorrect, f"tolerance=0.0 must reject non-exact float; got {verdicts}"
 
     def test_numeric_verifier_tolerance_is_stored_as_attribute(self) -> None:
         """The constructor kwarg is exposed as ``self.tolerance``.
@@ -108,7 +97,4 @@ class TestNumericVerifierToleranceConfig:
         ]
         for kwarg, expected in cases:
             v = NumericVerifier(tolerance=kwarg)
-            assert v.tolerance == pytest.approx(expected), (
-                f"tolerance={kwarg!r} must store as self.tolerance={expected!r}; "
-                f"got {v.tolerance!r}"
-            )
+            assert v.tolerance == pytest.approx(expected), f"tolerance={kwarg!r} must store as self.tolerance={expected!r}; got {v.tolerance!r}"

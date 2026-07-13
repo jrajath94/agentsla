@@ -67,13 +67,9 @@ def _call_claude(prompt: str, *, model: str, api_key: str | None) -> str:
     """Call Claude. Returns assistant text. No network unless key + SDK present."""
     effective_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
     if not effective_key:
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY required for real-LLM bench (or pass api_key=...)"
-        )
+        raise RuntimeError("ANTHROPIC_API_KEY required for real-LLM bench (or pass api_key=...)")
     if not _HAS_ANTHROPIC:
-        raise RuntimeError(
-            "anthropic package not installed; pip install anthropic to run live"
-        )
+        raise RuntimeError("anthropic package not installed; pip install anthropic to run live")
     client = anthropic.Anthropic(api_key=effective_key)
     msg = client.messages.create(
         model=model,
@@ -99,9 +95,7 @@ def run_real_llm_bench(
     parquet is honest when the API rate-limits mid-run.
     """
     if not api_key and not os.environ.get("ANTHROPIC_API_KEY"):
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY required for real-LLM bench (or pass api_key=...)"
-        )
+        raise RuntimeError("ANTHROPIC_API_KEY required for real-LLM bench (or pass api_key=...)")
 
     # Slice: tasks_per_domain per of 3 domains. No injections — real bench
     # measures honest output, not adversarial inputs (that's hermetic's job).
@@ -164,10 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     """Entry point for ``python -m agentsla bench-real``."""
     parser = argparse.ArgumentParser(
         prog="agentsla-bench-real",
-        description=(
-            "Run the real-LLM bench against Claude. "
-            "Requires ANTHROPIC_API_KEY env var or --api-key."
-        ),
+        description=("Run the real-LLM bench against Claude. Requires ANTHROPIC_API_KEY env var or --api-key."),
     )
     parser.add_argument("--model", default="claude-haiku-4-5-20251001")
     parser.add_argument("--tasks-per-domain", type=int, default=5)
