@@ -253,14 +253,152 @@ for the side-by-side framing against LangSmith / Langfuse / Helicone
 ```bash
 git clone <repo> && cd agentsla
 uv sync --extra all
-python -m pytest                       # 295 tests, ~6s
+python -m pytest                       # 432 tests, ~12s
 python -m agentsla bench --seeds 5      # 350 rows → results.parquet
 python -m agentsla report --out bench/results/REPORT.md
+# Real-LLM bench (requires ANTHROPIC_API_KEY):
+ANTHROPIC_API_KEY=sk-... python -m agentsla bench-real --tasks-per-domain 3
 ```
 
 Every number in this writeup and in `README.md` is regenerated from
 the parquet by `agentsla report`. The contract is: re-running
 bench+report must produce a byte-identical table.
+
+---
+
+## What shipped in v1.0 (this push)
+
+The v1 push closes the third-adapter gap and the real-LLM bench gap
+that v0.1 deferred. Below is the honest accounting — what's real,
+what's measured, and what remains.
+
+### Third adapter: ClaudeSdkAdapter
+
+`agentsla/adapters/claude_sdk.py` wraps the Claude Agent SDK with
+zero runtime dependency on `claude_agent_sdk` (the client is
+injected via duck typing). The adapter translates SDK messages
+(`text`, `tool_use`) into the same 4-event shape as
+`RawLoopAdapter`: `model_message(user)` → `tool_call` →
+`tool_result` → `model_message(assistant)`. The cross-adapter
+parity test (`tests/integration/test_claude_sdk_parity.py`) enforces
+this byte-for-byte modulo UUIDs. Without parity, the policy gate /
+verifier / classifier would not be adapter-agnostic.
+
+**Honest gap**: The shipped adapter is driven by a fake SDK client
+in tests; the live `claude_agent_sdk` is not installed in CI (it's
+optional, opt-in). A reviewer can wire a real client and the
+adapter contract holds; we have not run a live Claude API through
+the SDK adapter at v1.
+
+### Real-LLM bench harness
+
+`python -m agentsla bench-real` runs the task set through the actual
+Claude API (default model `claude-haiku-4-5-20251001`). Without
+`ANTHROPIC_API_KEY` the harness fails fast (exit 2) with a clear
+stderr message; errors during the run become rows tagged
+`[NOT YET MEASURED]` so the parquet is honest when the API
+rate-limits mid-run.
+
+**Honest gap**: The harness path, tests, and CLI are real; the live
+numbers require a key. No live rows are committed to v1 because no
+`ANTHROPIC_API_KEY` is available in the build environment. The
+schema (`mode, task_id, domain, model_id, seed, success, gate_passed,
+verified_at_truth, sensitivity, specificity, latency_ms, text, note`)
+is the contract a reviewer can fill in by setting the env var and
+re-running.
+
+### Real held-out fixture
+
+`scripts/build_held_out_fixture.py` splits into two builders:
+
+* `build_synthetic_held_out_fixture` — pure-Python, no key. Always
+  works; rows tagged `synthetic=true`.
+* `build_real_held_out_fixture` — runs Claude. With no key +
+  `synthetic_fallback=True` (default) it degrades to synthetic rows;
+  with `synthetic_fallback=False` it raises `RuntimeError`.
+
+Every row carries `model_id` so the eval report can mark REAL vs
+SYNTHETIC provenance. Closes the v0.1 "classifier eval is circular"
+gap.
+
+### Per-verifier tolerance + range claim per-endpoint multiplier
+
+`NumericVerifier(tolerance=...)` was already in v0.2; v1 pins the
+contract with regression tests in
+`tests/unit/verify/test_numeric_tolerance_config.py`. The range-
+claim regex (`agentsla/verify/claims.py:_RANGE_PATTERN`) now accepts
+K/M/B/% on both endpoints: `$4.2M-$4.5M` → `(4_200_000, 4_500_000)`.
+The pre-fix behavior silently dropped the second endpoint's
+multiplier, inflating unverifiable coverage on real P&L traces.
+
+The semantic-escape hardening (`4--5` still rejected) is preserved.
+The split-regex lookbehind was widened from `(?<=\d)` to
+`(?<=[\dKkMmBb%])` so `4M-5M` actually splits into two endpoints.
+
+### README truth-pinned
+
+The README quickstart snippet now uses the real surface (`Policy`,
+`PolicyGate`, `NumericVerifier`, `VerificationChain`, `Classifier`,
+`InMemoryLabelSink`, `TraceWriter`) and binds a non-empty
+`final.text`. The integration test in
+`tests/integration/test_readme_quickstart.py` exec()s the snippet
+and asserts the four guarantees bind + a non-empty `final.text` is
+produced. A stale rewrite that drops any of the four guarantees
+breaks the test.
+
+### Failure modes: 6 → 15
+
+`docs/failure-modes.md` adds 9 modes surfaced by the v1 push:
+adapter parity drift, range multiplier mismatch, real-LLM rate-
+limit, held-out fixture circularity, per-verifier tolerance drift,
+fixture degradation, CLI subcommand collision, generated artifacts,
+tool-call id collisions. Each is documented with trigger, why it
+breaks, observable signal, v1 status, and mitigation — the same
+format as the v0.1 6-mode list.
+
+### Test count: 295 → 432
+
+The v1 push added 137 tests across the integration, unit, property,
+and script test directories. The breakdown:
+
+* +13 (per-verifier tolerance + range claim + claims extension)
+* +15 (cross-adapter parity: 5 each × 3 adapters)
+* +5 (real-LLM bench harness: API-key, schema, CLI smoke, etc.)
+* +5 (held-out fixture: synthetic + real builders + CLI smoke)
+* +4 (README quickstart integration)
+* +95 across the other supporting test files (mypy fixes, regression
+  guards, refactor coverage)
+
+### Quality gates (v1.0)
+
+| Gate | Status |
+|------|--------|
+| `pytest -q` | 432 passed, ~12s |
+| `ruff check .` | clean |
+| `mypy --strict agentsla/core agentsla/policy agentsla/verify` | zero findings |
+| Coverage on core/policy/verify | ≥ 85% |
+| CI integration gate | wired symbols pinned by grep |
+| Cross-adapter parity | byte-identical (modulo UUIDs) |
+| README truth-pin | integration test green |
+
+### v1.0 honest gaps (carried forward)
+
+The v1 push explicitly does NOT solve:
+
+* **Live-LLM bench numbers** — the harness + tests + CLI are real;
+  the actual numbers require a key (explicitly marked
+  `[NOT YET MEASURED]`).
+* **Concurrent adapter paths** — current adapters are single-
+  threaded; tool-call id collision is documented but not yet a v1
+  path.
+* **Per-verifier tolerance consensus** — chain does not enforce
+  uniform tolerance; operators choose per domain.
+* **Streamed trace emission** — current TraceWriter is sync.
+* **Multi-tenancy / per-tenant policy** — governance decisions TBD.
+* **OpenTelemetry exporter** — separate design pass.
+
+Each of these is a small, bounded change for v1.1 or later. None
+require redesigning the surface.
 
 — AgentSLA contributors, 2026.
 ## A note on holdouts

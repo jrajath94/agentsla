@@ -165,3 +165,236 @@ and ships in the same commit as this document lands.
 - Replay drift across agent versions: not measured — replay is
   byte-identical because the bench is hermetic.
 - Tenant isolation / multi-tenancy: v0.2 work (per ROADMAP).
+
+---
+
+# v1 additions — what we learned shipping the third adapter
+
+The v1 push landed the ClaudeSdkAdapter, the real-LLM bench harness,
+the per-endpoint range-claim parser, and the per-verifier tolerance
+config. Each surfaced a new failure mode that v0.1's 6-mode list did
+not name. Below are the additional modes (7-15) we now know about,
+with the same format as above: trigger, why it breaks, observable
+signal, v1 status, mitigation.
+
+## 7. Adapter parity drift
+
+**Trigger**: The Claude SDK adapter, LangGraph adapter, and RawLoop
+adapter produce different event-kind sequences for the same task.
+
+**Why it breaks**: The cross-adapter parity test
+(`tests/integration/test_claude_sdk_parity.py`) asserts byte-identical
+event sequences (modulo UUIDs) for an echo task. If one adapter
+inserts a spurious `model_message` between `tool_call` and
+`tool_result`, the policy gate sees an event the verifier does not
+expect, and the Verdict emit fails silently.
+
+**Observable signal**: `tests/integration/test_claude_sdk_parity.py`
+test failure on event-sequence mismatch; or the bench's
+`parity.parquet` shows diverging `event_count` across adapters.
+
+**v1 status**: Mitigated. The parity test runs in CI. The
+RawLoopAdapter, LangGraphAdapter, and ClaudeSdkAdapter all emit the
+4-event shape (`model_message(user)` → `tool_call` →
+`tool_result` → `model_message(assistant)`).
+
+**Mitigation**: Keep the parity test under
+`tests/integration/`. Add a 4th adapter (e.g., a LiteLLMAdapter) only
+with an accompanying parity test update.
+
+---
+
+## 8. Per-endpoint range multiplier mismatch
+
+**Trigger**: A real P&L trace contains `$4.2M-$4.5M` (per-endpoint
+multiplier). v0.1's `_RANGE_PATTERN` matched the span but silently
+dropped the second endpoint's `M`, parsing it as `(4.2, 4.5)` —
+inflating unverifiable coverage because no tool result ever matches
+4.5 raw dollars.
+
+**Why it breaks**: The range claim's `[low, high]` is the interval
+the verifier checks the source value against. A mismatched interval
+either accepts wrong answers (when the true range is wider) or
+rejects correct ones (when the parsed interval is narrower than
+intended). Either failure surfaces as a false positive or false
+negative on the verdict.
+
+**Observable signal**: `verify.verified_at_truth=false` for tasks
+whose answer matches a clearly-stated P&L range. Trace-level
+investigation shows the range was parsed with the wrong scale.
+
+**v1 status**: Mitigated. `_RANGE_PATTERN` now accepts K/M/B/% on
+both endpoints. Tests in `tests/unit/verify/test_range_claim_extraction.py`
+pin the contract (5 tests including `$4.2M-$4.5M` → `(4_200_000,
+4_500_000)`).
+
+**Mitigation**: Keep the test coverage in
+`tests/unit/verify/test_range_claim_extraction.py`. Add a fuzz test
+that ranges over (low, high, multiplier-endpoint) tuples and asserts
+the parsed `(low, high)` matches the expected.
+
+---
+
+## 9. Real-LLM bench rate-limit exhaustion
+
+**Trigger**: The real-LLM bench (`python -m agentsla bench-real`) hits
+Claude's rate limit mid-run. v0.1 had no real-LLM bench; v1 added one
+with a 30-row default × `tasks_per_domain=5` × 3 domains = ~45 calls.
+
+**Why it breaks**: Without graceful degradation, a rate-limit error
+aborts the run and writes zero rows. The operator is left wondering
+which calls succeeded.
+
+**v1 status**: Mitigated. Every `_call_claude` exception becomes a row
+tagged `[NOT YET MEASURED] <exc>` with `success=false`. The parquet
+remains partially valid; the bench CLI exits 0 with a count of
+unmeasured rows in the summary.
+
+**Observable signal**: `python -m agentsla bench-real` prints
+`[NOT YET MEASURED] rows: N/M` in the summary. Operators can re-run
+later (rows are deterministic — same `seed` yields the same tasks).
+
+**Mitigation**: For production deployments, switch to batched API
+calls (`anthropic.Anthropic.messages.batch.create`) which has higher
+throughput and a separate rate-limit pool. Out of scope for v1.
+
+---
+
+## 10. Held-out fixture circularity regression
+
+**Trigger**: A new classifier trigger is added whose training data
+overlaps with the held-out fixture in `scripts/build_held_out_fixture.py`.
+The eval agreement metric returns to ceiling.
+
+**Why it breaks**: The whole point of the held-out fixture (PRD-v1
+F4) is to evaluate the classifier against patterns the heuristics
+were NOT tuned against. If a new trigger is tuned against the
+held-out categories, the eval loses its signal value.
+
+**Observable signal**: `python -m agentsla eval-classifier` reports
+≥95% agreement against the held-out set on categories the new trigger
+was tuned for.
+
+**v1 status**: Mitigated for v1 by pinning the fixture's row
+generators in `scripts/build_held_out_fixture.py` and tagging each
+row with its generator name (e.g., `gen_reasoning_error` → task_id
+`finops-heldout-1`). Any future trigger addition must (a) add a new
+generator with a NEW category, and (b) update the held-out fixture
+to include examples from that NEW category only.
+
+**Mitigation**: Document the rule in `agentsla/classify/` README. Add
+a CI check that grep's for `train_*` references in
+`scripts/build_held_out_fixture.py` and fails the build if any
+generator's category overlaps with the trigger training set.
+
+---
+
+## 11. Per-verifier tolerance drift
+
+**Trigger**: Two verifiers in the same `VerificationChain` use
+different `tolerance` values, and one verifier's float-rounding
+artifact falls inside its tolerance but outside another's.
+
+**Why it breaks**: The chain's pass criterion is
+`incorrect == 0 AND coverage >= threshold` — the same criterion for
+every verifier. But the per-verifier `tolerance` controls whether a
+claim is `correct` or `incorrect`. A chain mixing `1e-6` and `1e-3`
+verifiers can report `incorrect > 0` on a claim one verifier would
+have passed.
+
+**v1 status**: Documented. Per-verifier tolerance is now a public
+API surface (`NumericVerifier(tolerance=...)`) with a regression
+test in `tests/unit/verify/test_numeric_tolerance_config.py`. The
+chain does NOT enforce uniform tolerance — operators choose per
+domain (financial ops at 1e-9, doc-QA at 1e-3).
+
+**Mitigation**: Add a `VerificationChain(consensus_tolerance=...)`
+kwarg that requires all verifiers' tolerances to be within
+`consensus_tolerance` of each other, raising at construction time.
+v0.2 work.
+
+---
+
+## 12. Real-LLM fixture degradation to synthetic
+
+**Trigger**: `build_real_held_out_fixture()` is called without
+`ANTHROPIC_API_KEY` and `synthetic_fallback=True` (default). The
+fixture silently becomes synthetic, but the eval report still
+labels it "REAL."
+
+**Why it breaks**: The eval's REAL/SYNTHETIC provenance flag is the
+operator's signal for whether the eval is honest. If the fixture
+silently degrades without flagging it, the eval report misleads.
+
+**v1 status**: Mitigated by the per-row `synthetic` field. The eval
+CLI's report aggregates `synthetic=true` rows separately. But: the
+default behavior of falling back without warning is still surprising
+to first-time users.
+
+**Mitigation**: Add a stderr warning when `synthetic_fallback=True`
+triggers, naming the row count that was demoted. v0.2 work.
+
+---
+
+## 13. CLI subcommand collision
+
+**Trigger**: Adding a new CLI subcommand (`bench-real`) without
+checking the existing dispatch table.
+
+**Why it breaks**: `python -m agentsla <new-cmd>` falls into the
+default "unknown subcommand" branch and exits 1 with a non-obvious
+error. The README says the subcommand exists; the CLI rejects it.
+
+**v1 status**: Mitigated. `agentsla/__main__.py` now dispatches
+`bench-real`. The dispatch table is the single source of truth;
+adding a new subcommand requires editing both `__main__.py` and
+`agentsla/bench/__init__.py`.
+
+**Mitigation**: Move the dispatch to a `dict[str, Callable]` table
+to make the registration explicit and grep-able. v0.2 work.
+
+---
+
+## 14. Generated artifacts in repo
+
+**Trigger**: `bench/results/figures/*.png` and `eval_classifier.md`
+are regeneratable from parquet via `python -m agentsla report` and
+`python -m agentsla eval-classifier`. Committing them bloats the repo
+and creates stale-data risk when the source parquet changes without
+the artifacts being regenerated.
+
+**Why it breaks**: A reviewer reading `REPORT.md` sees a number
+that's stale relative to the latest `results.parquet`. The
+"byte-identical table from parquet" contract is violated by stale
+committed artifacts.
+
+**v1 status**: Accepted. The figures and eval_classifier.md ARE
+committed as a snapshot of the v1 push. They are marked as
+regeneratable in their header comments.
+
+**Mitigation**: Add a `make report` target that regenerates every
+artifact in `bench/results/` and a CI check that runs `make report`
+and fails if the committed artifact differs. v0.2 work.
+
+---
+
+## 15. Tool-call id collisions under concurrent adapters
+
+**Trigger**: Two adapters (e.g., ClaudeSdkAdapter + a hypothetical
+parallel execution path) generate `call_id` values from the same
+`uuid4()` namespace and the trace store's `UNIQUE(call_id)` constraint
+fires.
+
+**Why it breaks**: A `uuid4()` collision is astronomically unlikely,
+but if it happens, the second `tool_call` event with the duplicate
+id fails the `UNIQUE` constraint and the trace write aborts. The
+trace is left in a half-written state.
+
+**v1 status**: Out of scope. The shipped adapters are
+single-threaded. The bench harness runs one adapter per task per
+seed. There is no concurrent adapter path in v1.
+
+**Mitigation**: If a concurrent adapter path is added, generate
+`call_id` with a per-adapter prefix (e.g., `claude_` + uuid4 hex) so
+the trace store's UNIQUE constraint cannot fire across adapters.
+v0.2 work.

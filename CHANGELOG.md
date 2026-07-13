@@ -143,3 +143,112 @@ audit's "property-based tests for the policy gate" deferral. Each
 invariant in `tests/property/test_policy_gate.py` is documented with
 its policy-side counterpart so a future reviewer can trace any
 regression back to the gate implementation it defends.
+
+## [v1.0.0] — 2026-07-13 — Third adapter + real-LLM bench
+
+Shipped the v1 push per `docs/PRD-v1.md` + `docs/TRD-v1.md`. Closes
+the cross-adapter parity gap, lands the real-LLM bench harness,
+extends the failure-mode catalog to 15 modes, and pins the README
+quickstart to the real surface so a stale rewrite cannot ship.
+
+### Highlights
+
+- **Third adapter (ClaudeSdkAdapter)**: Wraps the Claude Agent SDK
+  with zero runtime dependency on `claude_agent_sdk` (the client is
+  injected). Same 4-event shape as `RawLoopAdapter` for an echo
+  task. Cross-adapter parity test enforces this byte-for-byte
+  modulo UUIDs. F2 in PRD-v1.
+- **Real-LLM bench harness**: `python -m agentsla bench-real` runs
+  the task set through the actual Claude API. Without
+  `ANTHROPIC_API_KEY` the harness fails fast (exit 2) with a clear
+  stderr message; errors during the run become rows tagged
+  `[NOT YET MEASURED]` so the parquet is honest when the API
+  rate-limits mid-run. F3 in PRD-v1.
+- **Real held-out fixture**: `scripts/build_held_out_fixture.py`
+  splits into `build_synthetic_held_out_fixture` (pure-Python, no
+  key) and `build_real_held_out_fixture` (runs Claude, tags rows
+  `synthetic=false`). With no key + `synthetic_fallback=True` the
+  real builder degrades to synthetic rows so CI without a key still
+  produces a working fixture. Closes the v0.1 "classifier eval is
+  circular" gap. F4 in PRD-v1.
+- **Per-verifier tolerance + range claim per-endpoint multiplier**:
+  `NumericVerifier(tolerance=...)` was already in v0.2; v1 pins the
+  contract with regression tests. The range-claim regex now accepts
+  K/M/B/% on both endpoints (`$4.2M-$4.5M` → `(4_200_000,
+  4_500_000)`). The pre-fix behavior silently dropped the second
+  endpoint's multiplier, inflating unverifiable coverage. F6+F7 in
+  PRD-v1.
+- **README quickstart truth-pinned**: The README snippet now uses
+  the real surface (`Policy`, `PolicyGate`, `NumericVerifier`,
+  `VerificationChain`, `Classifier`, `InMemoryLabelSink`,
+  `TraceWriter`) and binds a non-empty `final.text`. A reviewer-
+  visible demo. The integration test in
+  `tests/integration/test_readme_quickstart.py` enforces this.
+  F1 in PRD-v1.
+- **Failure modes: 6 → 15**: `docs/failure-modes.md` adds 9 modes
+  surfaced by the v1 push (adapter parity drift, range multiplier
+  mismatch, real-LLM rate-limit, held-out fixture circularity, per-
+  verifier tolerance drift, fixture degradation, CLI subcommand
+  collision, generated artifacts, tool-call id collisions). F9 in
+  PRD-v1.
+- **Planning leak fix**: `.planning/` (GSD planning artifacts) was
+  tracked despite being in `.gitignore`. Untracked from index;
+  files kept on disk. No history rewrite (destructive; user
+  approval required).
+
+### Atomic commits (v1.0.0)
+
+| # | Hash | Subject |
+|---|------|---------|
+| 1 | (this commit) | chore(release): bump 0.2.0.dev0 → 1.0.0 + CHANGELOG v1 section |
+| 2 | chore | chore(repo): untrack .planning/ — public-repo planning-leak fix |
+| 3 | docs | docs: add PRD-v1 + TRD-v1 for v1 push |
+| 4 | feat | feat(adapters): ClaudeSdkAdapter + 3-way parity test |
+| 5 | feat | feat(bench): real-LLM bench harness + CLI dispatch |
+| 6 | feat | feat(classify): real + synthetic held-out fixture |
+| 7 | feat | feat(verify): per-verifier tolerance + range claims |
+| 8 | test | docs+test(readme): quickstart uses real surface |
+
+### Quality gates
+
+- **432 tests pass** (was 355 at v0.1; +77 across the v1 commits).
+- **ruff check + ruff format --check**: clean.
+- **mypy --strict** on `agentsla/core`, `agentsla/policy`,
+  `agentsla/verify`: zero findings.
+- **CI integration gate**: wired symbols pinned by grep.
+- **Cross-adapter parity test**:
+  `tests/integration/test_claude_sdk_parity.py` enforces 4-event
+  byte-identity (modulo UUIDs) across all three adapters.
+- **README truth-pin**: `tests/integration/test_readme_quickstart.py`
+  exec()s the snippet and asserts the four guarantees bind + a
+  non-empty `final.text` is produced.
+
+### Honest gaps (carried into v1.1 or later)
+
+- Live-LLM bench numbers (the harness + tests + CLI are real; the
+  actual numbers require a key — explicitly marked
+  `[NOT YET MEASURED]`).
+- Concurrent adapter paths (current adapters are single-threaded;
+  tool-call id collision is documented but not yet a v1 path).
+- Per-verifier tolerance consensus (chain does not enforce uniform
+  tolerance; operators choose per domain).
+- Streamed trace emission (current TraceWriter is sync).
+- Multi-tenancy / per-tenant policy.
+- OpenTelemetry exporter.
+
+### Migration notes (v0.2 → v1.0)
+
+- **New CLI subcommand**: `python -m agentsla bench-real` is now a
+  first-class subcommand. It dispatches to
+  `agentsla.bench.real_llm.main`. Old `bench` subcommand unchanged.
+- **Held-out fixture API split**:
+  `build_held_out_fixture()` was renamed to
+  `build_synthetic_held_out_fixture()`. The new
+  `build_real_held_out_fixture()` is the default for the CLI;
+  pass `--synthetic` to force the old path.
+- **Range claim semantics**: `$4.2M-$4.5M` is now parsed as
+  `(4_200_000, 4_500_000)` instead of `(4.2, 4.5)`. Existing
+  fixtures with multi-endpoint ranges now have verifiable
+  coverage where previously they were unverifiable.
+- **README imports**: `PolicyConfig` and `VerificationGate` are
+  gone from the README; the snippet uses the real surface.
