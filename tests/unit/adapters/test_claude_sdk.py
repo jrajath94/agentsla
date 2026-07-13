@@ -416,3 +416,157 @@ class TestClaudeSdkClientQuery:
         a.run("t-qk", hooks=NoOpHooks())
         # At least one call carries a ``tools`` kwarg naming the registered tool.
         assert any("tools" in c and "json_echo" in (c["tools"] or []) for c in fake.calls)
+
+
+# ---------------------------------------------------------------------------
+# Edge cases — coverage targets for branches the happy-path tests miss
+# ---------------------------------------------------------------------------
+
+
+class TestClaudeSdkEdgeCases:
+    def test_resolve_final_text_when_tool_output_none(self) -> None:
+        """Lines 186-189: tool_output=None OR tool_name=None → echo of task_text."""
+        a = ClaudeSdkAdapter(
+            client=FakeSdkClient([FakeSdkMessage(kind="text", text="ignored")]),
+            task_text="hello",
+        )
+        assert a._resolve_final_text(None, None) == "<echo:hello>"
+        assert a._resolve_final_text(None, "json_echo") == "<echo:hello>"
+
+    def test_resolve_final_text_with_str_output(self) -> None:
+        """Lines 190-191: str output → '<echo:task>::<output>'."""
+        a = ClaudeSdkAdapter(
+            client=FakeSdkClient([]),
+            task_text="hi",
+        )
+        assert a._resolve_final_text("the answer", "json_echo") == "<echo:hi>::the answer"
+
+    def test_resolve_final_text_with_non_str_output(self) -> None:
+        """Lines 192: non-str output (e.g. dict, int) → str() conversion."""
+        a = ClaudeSdkAdapter(
+            client=FakeSdkClient([]),
+            task_text="hi",
+        )
+        assert a._resolve_final_text({"k": "v"}, "json_echo") == "<echo:hi>::{'k': 'v'}"
+        assert a._resolve_final_text(42, "json_echo") == "<echo:hi>::42"
+
+    def test_iter_sdk_messages_returns_iter_for_list_result(self) -> None:
+        """Line 138: when client.query returns a list, wrap in iter().
+
+        The real SDK returns an iterator, but lenient SDKs may return a list;
+        the adapter must handle both.
+        """
+
+        class _ListReturningClient:
+            def __init__(self, items: list[Any]) -> None:
+                self._items = items
+
+            def query(self, prompt: str, **kw: Any) -> Any:
+                return self._items  # raw list, not iterator
+
+        client = _ListReturningClient([FakeSdkMessage(kind="text", text="from-list")])
+        a = ClaudeSdkAdapter(client=client, task_text="x")
+        msgs = list(a._iter_sdk_messages(client, "x"))
+        assert len(msgs) == 1
+        assert msgs[0].kind == "text"
+
+    def test_max_messages_safety_cap_breaks_runaway(self) -> None:
+        """Line 241: SDK yields > max_messages → adapter breaks the loop.
+
+        The SDK is allowed to emit unbounded messages; the adapter caps at
+        max_messages to protect against runaway streams in long-running
+        environments. Default is 16.
+        """
+        # Build 50 text messages — way more than max_messages=4.
+        msgs = [FakeSdkMessage(kind="text", text=f"msg-{i}") for i in range(50)]
+        fake = FakeSdkClient([msgs])
+        a = ClaudeSdkAdapter(client=fake, task_text="x", max_messages=4)
+        out = a.run("t-max", hooks=NoOpHooks())
+        # First text message ends the SDK turn (line 325). So the cap is
+        # only reached if the SDK yields non-text messages. The adapter
+        # must not crash; final_text is set by the first text encountered.
+        assert out.text == "msg-0"
+
+    def test_max_messages_break_via_unknown_kind_loop(self) -> None:
+        """Line 241: SDK yields > max_messages non-text/unknown messages → cap fires.
+
+        No text message ever arrives, so the cap is the only thing that ends
+        the loop. final_text falls back to the echo (line 335).
+        """
+        # Build 20 unknown-kind messages (no .kind='text', no .kind='tool_use').
+        msgs = [FakeSdkMessage(kind="other", payload=f"x{i}") for i in range(20)]
+        fake = FakeSdkClient([msgs])
+        a = ClaudeSdkAdapter(client=fake, task_text="hello", max_messages=3)
+        out = a.run("t-cap", hooks=NoOpHooks())
+        # No tool called + no text → fallback to echo (line 335).
+        assert out.text == "<echo:hello>"
+
+    def test_unknown_tool_name_is_skipped(self) -> None:
+        """Line 251: SDK emits tool_use for a tool not registered → skip.
+
+        Defends against the SDK proposing tools the adapter doesn't know
+        about; the adapter must not crash and must eventually pick up the
+        terminal text message.
+        """
+        tool_use = FakeSdkMessage(
+            kind="tool_use",
+            name="not_registered_tool",
+            input={"x": 1},
+            id="c1",
+            parent_msg_id="msg_1",
+        )
+        final = FakeSdkMessage(kind="text", text="terminal", parent_msg_id="msg_1")
+        fake = FakeSdkClient([tool_use, final])
+        a = ClaudeSdkAdapter(client=fake, task_text="x")
+        out = a.run("t-unknown-tool", hooks=NoOpHooks())
+        # Tool was skipped; final text is the terminal message.
+        assert out.text == "terminal"
+        # No ToolCall events written.
+        assert not any(ev.kind == "tool_call" for ev in out.trace.events)
+
+    def test_tool_use_with_no_name_attribute_is_skipped(self) -> None:
+        """Line 251: tool_use message has no ``.name`` → skip.
+
+        Defensive against malformed SDK messages (missing name attribute).
+        """
+
+        class _MalformedToolUse:
+            kind = "tool_use"
+            input = {"x": 1}
+
+        final = FakeSdkMessage(kind="text", text="ok", parent_msg_id="msg_1")
+        fake = FakeSdkClient([_MalformedToolUse(), final])
+        a = ClaudeSdkAdapter(client=fake, task_text="x")
+        out = a.run("t-no-name", hooks=NoOpHooks())
+        assert out.text == "ok"
+
+    def test_unknown_message_kind_is_skipped(self) -> None:
+        """Line 328: message with unknown kind → skip (forward-compat).
+
+        New SDK message kinds (e.g. 'thinking', 'citation') must not crash
+        the adapter. They are silently consumed.
+        """
+        thinking = FakeSdkMessage(kind="thinking", text="considering...")
+        final = FakeSdkMessage(kind="text", text="answer", parent_msg_id="msg_1")
+        fake = FakeSdkClient([thinking, final])
+        a = ClaudeSdkAdapter(client=fake, task_text="x")
+        out = a.run("t-unknown-kind", hooks=NoOpHooks())
+        assert out.text == "answer"
+        # thinking kind not represented in events (no model_message for it).
+        # Only the user + assistant messages end up in trace.events.
+        kinds = [ev.kind for ev in out.trace.events]
+        assert "thinking" not in kinds
+
+    def test_text_message_ends_iteration(self) -> None:
+        """Lines 317-325: first 'text' message sets final_text and breaks the loop.
+
+        Even if more messages follow, the first text is the terminal answer.
+        """
+        # Three text messages — only the first should be used.
+        m1 = FakeSdkMessage(kind="text", text="FIRST", parent_msg_id="msg_1")
+        m2 = FakeSdkMessage(kind="text", text="SECOND", parent_msg_id="msg_1")
+        m3 = FakeSdkMessage(kind="text", text="THIRD", parent_msg_id="msg_1")
+        fake = FakeSdkClient([m1, m2, m3])
+        a = ClaudeSdkAdapter(client=fake, task_text="x")
+        out = a.run("t-first-text", hooks=NoOpHooks())
+        assert out.text == "FIRST"
