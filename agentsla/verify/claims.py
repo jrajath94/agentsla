@@ -46,25 +46,31 @@ _KIND_BY_PATTERN: list[tuple[str, re.Pattern[str]]] = [
     ("int", re.compile(r"(?<![A-Za-z\.\d])-?\d+(?!\.\d)")),
 ]
 
-# Range claim patterns. Recognise "$4.2-$4.5", "4.2 to 4.5",
-# "100-150". Suffix multipliers (4.2M-4.5M) are intentionally not
-# supported here — the parser stays narrow; per-endpoint multipliers
-# would inflate false-positive risk on date/phone spans.
+# Range claim patterns. Recognise ``$4.2-$4.5``, ``4.2 to 4.5``,
+# ``100-150``, and per-endpoint suffixed forms ``$4.2M-$4.5M`` /
+# ``1.2K-1.5K`` (v1 F7 — fixes the silently-dropped ranges that
+# inflated unverifiable coverage).
 #
-# Security note: the second half's sign is gated by ``(?:\s*-)?``,
-# requiring a whitespace boundary before the optional sign. This blocks
-# the semantic-escape case "4--5" → (4, -5): the first dash is the
-# separator, and without this anchor the second dash would slide into
-# the second number's optional sign, producing a range with a negative
-# high endpoint that downstream verifiers treat as legitimate.
+# Security note: the second half's sign is gated by ``(?<!-)-``,
+# requiring the preceding character to be non-dash before the optional
+# sign can match. This blocks the semantic-escape case ``4--5`` →
+# ``(4, -5)``: without this lookbehind, the second ``-`` would slide
+# into the second number's optional sign, producing a range with a
+# negative high endpoint that downstream verifiers treat as legitimate.
 # Whitespace-separated signs (``-4 to -5``) still match because the
 # ``\s*`` between the separator and the second half consumes the
-# boundary. The pattern is also intentionally narrow on suffix
-# multipliers — see ``docs/failure-modes.md § 6``.
+# boundary. The multiplier suffix (\s?[KkMmBb%]?) is anchored
+# *after* the digit run so it cannot loosen the sign guard on the
+# second endpoint.
 _RANGE_PATTERN = re.compile(
-    r"(?:\$|€|£|¥)?\s*-?\d+(?:[\.,]\d+)?"
+    # First endpoint: optional currency, optional sign, digits with
+    # comma/decimals, optional whitespace + multiplier suffix (K/M/B/%).
+    r"(?:\$|€|£|¥)?\s*-?\d+(?:[\.,]\d+)?\s?[KkMmBb%]?"
     r"\s*(?:-|–|—|\bto\b)\s*"  # noqa: RUF001 — en-dash is a valid range separator
-    r"(?:\$|€|£|¥)?\s*(?:(?<!-)-)?\d+(?:[\.,]\d+)?"
+    # Second endpoint: same shape. The sign here is gated by ``(?<!-)-``
+    # so the separator dash cannot slide into the second number's
+    # optional sign — see semantic-escape note below.
+    r"(?:\$|€|£|¥)?\s*(?:(?<!-)-)?\d+(?:[\.,]\d+)?\s?[KkMmBb%]?"
 )
 
 
@@ -137,6 +143,13 @@ def _parse_range(raw: str) -> tuple[float | None, float | None]:
     """Split ``"$4.2-$4.5"`` → ``(4.2, 4.5)``.
 
     Currency symbols are stripped; commas inside numbers are removed.
+    A trailing ``K`` / ``M`` / ``B`` (case-insensitive) applies the
+    multiplier ``1e3`` / ``1e6`` / ``1e9`` respectively — applied
+    symmetrically to both endpoints so ``$4.2M-$4.5M`` becomes the
+    expected pair ``(4_200_000, 4_500_000)``. The percent sign is
+    stripped without scaling, consistent with the single-claim
+    extractor (``12.5%`` → ``12.5``, not ``0.125``).
+
     Returns ``(None, None)`` if the input cannot be parsed, including:
 
       * either endpoint is empty / non-numeric after currency stripping
@@ -150,12 +163,14 @@ def _parse_range(raw: str) -> tuple[float | None, float | None]:
     separator boundary, producing 4 parts instead of 2.
     """
     raw = raw.strip()
-    # Two-alternative split: a digit-anchored dash (the common ``4-5`` /
-    # ``100-150`` case) OR whitespace-anchored ``to``. A plain
-    # ``\s*-\s*`` alternative would also match the leading sign dash
-    # in ``-4 to -5``, producing 4 parts; the digit lookbehind gates
-    # the dash split to "this dash is between two numbers".
-    parts = re.split(r"(?<=\d)\s*-\s*|\s+to\s+", raw)
+    # Two-alternative split: a digit-or-multiplier-anchored dash (the
+    # common ``4-5`` / ``100-150`` / ``4M-5M`` cases) OR whitespace-
+    # anchored ``to``. A plain ``\s*-\s*`` alternative would also match
+    # the leading sign dash in ``-4 to -5``, producing 4 parts; the
+    # lookbehind gates the dash split to "this dash is between two
+    # numbers — optionally followed by a K/M/B/% suffix". The class is
+    # case-mixed so ``4M-5M`` and ``4m-5m`` both split correctly.
+    parts = re.split(r"(?<=[\dKkMmBb%])\s*-\s*|\s+to\s+", raw)
     if len(parts) != 2:
         return None, None
     nums: list[float] = []
@@ -164,8 +179,18 @@ def _parse_range(raw: str) -> tuple[float | None, float | None]:
         cleaned = cleaned.replace(",", "")
         if not cleaned or cleaned in {"-", ".", "-."}:
             return None, None
+        # Apply a trailing multiplier (K/M/B, case-insensitive). Pinned
+        # to a single trailing character so ``4M-4.5M`` works but
+        # ``4MB`` does not (last char bounds it). Percent is stripped
+        # above without scaling, matching the single-claim extractor.
+        mult = 1.0
+        if cleaned and cleaned[-1].upper() in _RANGE_MULTIPLIERS:
+            mult = _RANGE_MULTIPLIERS[cleaned[-1].upper()]
+            cleaned = cleaned[:-1]
+        if not cleaned or cleaned in {"-", ".", "-."}:
+            return None, None
         try:
-            nums.append(float(cleaned))
+            nums.append(float(cleaned) * mult)
         except ValueError:
             return None, None
     # Degenerate range: low == high is almost always a parse artifact
@@ -177,7 +202,18 @@ def _parse_range(raw: str) -> tuple[float | None, float | None]:
         return None, None
     if nums[0] > nums[1]:
         nums[0], nums[1] = nums[1], nums[0]
-    return nums[0], nums[1]
+    return nums[0], nums[1]  # type: ignore[return-value]  # mypy: list items narrowed by try/except above
+
+
+# Per-endpoint multiplier table for range claims (v1 F7). Pinned to a
+# single trailing character in ``_parse_range`` so double-suffix inputs
+# (``"4MB"``) cannot silently produce unexpected scales. Percents are
+# handled by stripping without scaling (see ``_parse_range`` for rationale).
+_RANGE_MULTIPLIERS: dict[str, float] = {
+    "K": 1e3,
+    "M": 1e6,
+    "B": 1e9,
+}
 
 
 _EXPR_PATTERN = re.compile(r"\b(?:\d+(?:\.\d+)?\s*[+\-*/]\s*)+\d+(?:\.\d+)?\b|\(\s*\d+(?:\.\d+)?\s*[+\-*/]\s*\d+(?:\.\d+)?\s*\)")
