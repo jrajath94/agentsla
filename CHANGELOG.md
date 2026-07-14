@@ -33,6 +33,31 @@ The currently shipped release is `[v0.2.0] — 2026-07-14` (this entry
 below). v1.0.0 is deferred until the features in the retracted section
 actually exist in the source tree.
 
+## [v0.2.2] — 2026-07-14 — Patch: metrics idempotency under repeated build_metrics()
+
+CI / `pytest tests/` was failing intermittently with
+`ValueError: Duplicated timeseries in CollectorRegistry: {...}`
+because the bench harness's module-level `_METRICS = build_metrics()`
+singleton could be re-executed by pytest-cov's importlib hooks or by
+the transitive import of `agentsla.bench.__init__` (which pulls the
+harness package init side-effect — so any test that imports
+`agentsla.bench.X` reloads the harness top). The second register hit
+the global REGISTRY and exploded.
+
+Fix: closure-cached `build_metrics()` in `agentsla/classify/metrics.py`.
+Same `registry` argument (including the default global one) returns
+the same `MetricsBundle` instance on repeat calls rather than
+re-registering. Test isolation: `CollectorRegistry()` callers still
+get fresh bundles.
+
+**No source changes for users.** This patch removes a latent CI flake
+that would have surfaced again any time bench + classify tests ran
+together under coverage tracking. Pre-fix local sequence:
+`tests/unit/classify/test_metrics.py::test_idempotent*` passed in
+isolation, `tests/` failed 13/474; post-fix: 476/476 green.
+
+**Release:** https://github.com/jrajath94/agentsla/releases/tag/v0.2.2
+
 ## [v0.2.1] — 2026-07-14 — Patch: fix wheel entry point
 
 Re-release of the v0.2.0 wheel with the `agentsla` console_script
