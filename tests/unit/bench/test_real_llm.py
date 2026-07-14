@@ -181,8 +181,8 @@ class TestBothModesEmitted:
         table = pq.read_table(out_path)
         modes = set(table.column("mode").to_pylist())
         assert modes == {"naked", "wrapped"}, f"parquet must carry both modes for honest comparison; got {modes}"
-        # Row count must be 2 × (tasks_per_domain × 3 domains × seeds).
-        assert table.num_rows == 2 * 1 * 3 * 1, f"expected 6 rows (2 modes × 1 task × 3 domains × 1 seed); got {table.num_rows}"
+        # Row count must be 2 * (tasks_per_domain * 3 domains * seeds).
+        assert table.num_rows == 2 * 1 * 3 * 1, f"expected 6 rows (2 modes * 1 task * 3 domains * 1 seed); got {table.num_rows}"
 
     def test_gate_denies_response_containing_aws_key(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         """Wrapped row with text containing an AWS key pattern → gate_passed=False,
@@ -191,8 +191,8 @@ class TestBothModesEmitted:
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
 
         def _fake_call(prompt: str, *, model: str, api_key: str | None) -> str:
-            # Echo with an embedded AWS key — egress regex AKIA[0-9A-Z]{16} should fire.
-            return f"The result is AKIAIOSFODNN7EXAMPLE which is the example key."
+            # Echo with an embedded AWS key -- egress regex AKIA[0-9A-Z]{16} should fire.
+            return "The result is AKIAIOSFODNN7EXAMPLE which is the example key."
 
         from agentsla.bench.real_llm import run_real_llm_bench
 
