@@ -20,7 +20,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: uv sync --extra all
+        run: uv sync --extra all --group dev
 
       - name: Ruff check
         run: uv run ruff check .
@@ -42,7 +42,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: uv sync --extra all
+        run: uv sync --extra all --group dev
 
       - name: Run tests with coverage gate (>=85%)
         run: uv run pytest tests/ -v --cov=agentsla/core --cov=agentsla/policy --cov=agentsla/verify --cov-fail-under=85 --cov-report=xml
@@ -63,7 +63,10 @@ jobs:
 
       - name: Validate commit subjects
         env:
-          PATTERN: '^(feat|fix|perf|test|docs|refactor|bench|ci)(\(.+\))?!?: .{1,72}$'
+          # Conventional Commits permitted types. `chore` + `style` were
+          # added in v0.2 after the v0.1 validator (which omitted them)
+          # rejected 4 commits in PR #1 — see CHANGELOG § [v0.2.0] CI notes.
+          PATTERN: '^(feat|fix|perf|test|docs|refactor|bench|ci|chore|style)(\(.+\))?!?: .{1,72}$'
         run: |
           set -euo pipefail
           bad=0
@@ -91,7 +94,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: uv sync --extra all
+        run: uv sync --extra all --group dev
 
       # 1. Bench reproducer: every README headline number must be
       # regenerable from this parquet. Small N (seeds=2) keeps the
