@@ -42,13 +42,35 @@ class MetricsBundle:
 def build_metrics(registry: Any = None) -> MetricsBundle:
     """Build the bundle. Raises if prometheus_client is unavailable.
 
-    Pass ``registry=CollectorRegistry()`` for tests to avoid duplicate-series
-    collisions on the default global registry.
+    Idempotent: calling ``build_metrics()`` twice with the same registry
+    returns the same ``MetricsBundle`` instance rather than raising
+    ``ValueError: Duplicated timeseries`` from prometheus_client. This
+    matters because ``agentsla/bench/harness.py`` registers a module-level
+    singleton at import time — pytest-cov reloads modules in test sessions,
+    and any other path that imports the bench twice (transitively through
+    ``agentsla.bench``'s package init) would otherwise blow up.
+
+    Pass ``registry=CollectorRegistry()`` to keep tests isolated from the
+    production global registry.
     """
+    # Cache by (id(registry),) so two calls with the same registry arg
+    # return the same bundle. Cache lives in the function closure so it
+    # dies with the module — acceptable for a process-level singleton.
+    cache_attr = "_bundles_by_id"
+    cache: dict[int, MetricsBundle] = getattr(build_metrics, cache_attr, {})  # type: ignore[attr-defined]
+    setattr(build_metrics, cache_attr, cache)
+
+    # None means "use the default global registry" — id() it for cache key.
+    # For all other registries (including tests' CollectorRegistry()), use
+    # id() which is stable for the lifetime of the object.
+    key = id(registry) if registry is not None else id(None)
+    if key in cache:
+        return cache[key]
+
     if Counter is None:  # pragma: no cover
         raise RuntimeError("prometheus_client not installed; install with `uv add prometheus-client`")
     kwargs = {"registry": registry} if registry is not None else {}
-    return MetricsBundle(
+    bundle = MetricsBundle(
         failures_total=Counter(
             "agentsla_failures_total",
             "Number of failed traces, partitioned by failure category.",
@@ -68,6 +90,8 @@ def build_metrics(registry: Any = None) -> MetricsBundle:
         ),
         registry=registry,
     )
+    cache[key] = bundle
+    return bundle
 
 
 def on_classify_callback(metrics: MetricsBundle):
