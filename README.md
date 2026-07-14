@@ -1,7 +1,7 @@
 # AgentSLA
 
 [![CI](https://github.com/jrajath94/agentsla/actions/workflows/test.yml/badge.svg)](https://github.com/jrajath94/agentsla/actions/workflows/test.yml)
-[![Release v0.2.0](https://img.shields.io/badge/release-v0.2.0-blue)](https://github.com/jrajath94/agentsla/releases/tag/v0.2.0)
+[![Release v0.2.2](https://img.shields.io/badge/release-v0.2.2-blue)](https://github.com/jrajath94/agentsla/releases/tag/v0.2.2)
 [![codecov](https://codecov.io/gh/jrajath94/agentsla/branch/main/graph/badge.svg)](https://codecov.io/gh/jrajath94/agentsla)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)

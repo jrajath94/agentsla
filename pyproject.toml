@@ -57,6 +57,10 @@ test = [
   "pytest-asyncio==1.4.0",
   "pytest-cov==7.1.0",
   "hypothesis==6.156.4",
+  # Two test fixtures exercise `jsonschema.validate()` (policy.ToolRule.json_schema
+  # + classify heuristics `trigger_format_violation`); runtime lazy-imports so
+  # production doesn't need it, but tests cannot run the gated paths without it.
+  "jsonschema==4.26.0",
 ]
 
 # `agentsla[all]` pulls every adapter + the bench surface — convenient for the
