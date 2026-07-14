@@ -179,6 +179,18 @@ The wrapped path adds ~3 ms of overhead at p95 in the hermetic bench (gate + ver
 
 **Seeded-error experiment** — verification gate catches 100% of ±10% and ±20% perturbed numeric claims at 0% false-correction cost (see `seeded_errors_section.md` after running).
 
+### Figures
+
+After `agentsla bench --all`, render PNGs into `bench/results/figures/` (also auto-included by `agentsla report`):
+
+```bash
+python -m agentsla.bench.figures \
+    --in bench/results/results.parquet \
+    --out-dir bench/results/figures
+```
+
+Produces `success_rate.png`, `gate_passed.png`, `injection_resistance.png`, `latency_cdf.png`, `cost_per_task.png`. Figure numbers are computed by the same `_aggregate()` function as the README tables — no possibility of drift. See `bench/results/REPORT.md § Figures` after running.
+
 ## Design Notes
 
 **Verification Coverage as a First-Class Metric**: "Verified" is meaningless without knowing how much of the response was actually checked. AgentSLA emits coverage_pct alongside every verdict.
