@@ -38,6 +38,9 @@ metrics = [
 bench = [
   "typer==0.26.8",
   "rich==15.0.0",
+  # `bench-real` (live API runs) calls Anthropic / an Anthropic-compatible
+  # gateway; keep the SDK optional so the hermetic install stays hermetic.
+  "anthropic>=0.40",
 ]
 # v0.2: matplotlib-driven figures for REPORT.md + README (figures CLI).
 # numpy pinned <2 because matplotlib's transitive numpy>=2.5 stub uses Python
