@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import sys
 
-from agentsla.bench import bench_main, real_llm_main, report_main, seeded_main
 from agentsla.cli import replay as replay_mod
 from agentsla.cli import run as run_mod
 
@@ -33,12 +32,20 @@ def main(argv: list[str] | None = None) -> int:
     if cmd == "replay":
         return replay_mod.main(rest)
     if cmd == "bench":
+        from agentsla.bench import bench_main
+
         return bench_main(rest)
     if cmd == "bench-seeded-errors":
+        from agentsla.bench import seeded_main
+
         return seeded_main(rest)
     if cmd == "bench-real":
+        from agentsla.bench import real_llm_main
+
         return real_llm_main(rest)
     if cmd == "report":
+        from agentsla.bench import report_main
+
         return report_main(rest)
     print(f"unknown subcommand: {cmd!r}", file=sys.stderr)
     return 1
