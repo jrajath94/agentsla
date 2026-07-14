@@ -1,5 +1,7 @@
 # AgentSLA — Execution Plan (Target State, No Stages)
 
+**STATUS: HISTORICAL — all 12 DoD items shipped at v0.2 close (see CHANGELOG `[v0.2.0]`/`[v0.2.2]`).** Retained as the trajectory record for the v0.1→v0.2 push and as interview-prep context. For active execution plans going forward, see `docs/PRD-v1.md` (Claude SDK + Real-LLM bench push) + `docs/TRD-v1.md`.
+
 **Purpose:** one document. Tells the implementing engineer (human or AI) exactly what ships and when to stop. No v0.1 / v0.2 / v0.3 phases — every item below is the **target state** for this push. Anything not on this list is out of scope.
 
 **Read after:** none. This is the source of truth for execution.
