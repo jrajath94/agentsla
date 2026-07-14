@@ -32,6 +32,19 @@ _Generated from `bench/results/results.parquet`._
 | naked | 16 | 100% | 0% | n/a | 6.00 |
 | wrapped | 16 | 88% | 100% | n/a | 8.69 |
 
+## Seeded-error experiment (verification gate validation)
+
+_Generated from `bench/results/seeded_errors.parquet`. Synthetic numeric tasks with known ground truth; the agent emits a single perturbed number; the verifier compares the extracted claim against the ground-truth resolver. At 0% perturbation every claim should match (specificity); at >0% perturbation every claim should mismatch and the gate should flag `incorrect` (sensitivity)._
+
+| Perturbation | N trials | Sensitivity (gate caught) | Specificity (clean pass) | Mean latency (ms) |
+|-------------:|---------:|--------------------------:|-------------------------:|------------------:|
+| ±10.0% | 1000 | 100% | 0% | 16.81 |
+| ±20.0% | 1000 | 100% | 0% | 5.84 |
+
+**Acceptance** (per `feedback.md` Item 3):
+- sensitivity @ ±50% perturbation ≥ 85%
+- specificity @ 0% perturbation ≥ 90%
+
 ## Cross-adapter parity (rawloop vs langgraph)
 
 _Generated from `bench/results/parity.parquet`._
@@ -46,3 +59,25 @@ _Generated from `bench/results/parity.parquet`._
 **Event-count agreement:** 100%
 
 Event-kind sequence equality is enforced by the unit suite (`tests/integration/test_cross_adapter_parity.py`); this section surfaces the parity evidence at the bench scale.
+
+## Figures
+
+### Cost Per Task
+
+![Cost Per Task](figures/cost_per_task.png)
+
+### Gate Passed
+
+![Gate Passed](figures/gate_passed.png)
+
+### Injection Resistance
+
+![Injection Resistance](figures/injection_resistance.png)
+
+### Latency Cdf
+
+![Latency Cdf](figures/latency_cdf.png)
+
+### Success Rate
+
+![Success Rate](figures/success_rate.png)
