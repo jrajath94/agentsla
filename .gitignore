@@ -118,3 +118,6 @@ Thumbs.db
 .venv
 ENV/
 env/
+
+# Claude Code / MCP browser session artifacts
+.playwright-mcp/
