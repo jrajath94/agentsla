@@ -33,6 +33,24 @@ The currently shipped release is `[v0.2.0] — 2026-07-14` (this entry
 below). v1.0.0 is deferred until the features in the retracted section
 actually exist in the source tree.
 
+## [v0.2.1] — 2026-07-14 — Patch: fix wheel entry point
+
+Re-release of the v0.2.0 wheel with the `agentsla` console_script
+fixed. v0.2.0 was the first release and shipped a wheel whose
+`[project.scripts]` entry pointed at `agentsla.cli:app`, but
+`app` is not defined anywhere in `agentsla.cli.__init__`; the
+actual dispatcher is `agentsla.__main__:main`. A fresh venv install
+of the v0.2.0 wheel would import the package but the `agentsla`
+console command would fail with `ImportError: cannot import name
+'app' from 'agentsla.cli'`. v0.2.1 fixes the entry point and
+rebuilds the wheel.
+
+**No source changes between v0.2.0 and v0.2.1 — this is a pure
+release-process patch.** The git tag for v0.2.1 points at a commit
+that adds this CHANGELOG entry + bumps `pyproject.toml` to 0.2.1.
+
+**Release:** https://github.com/jrajath94/agentsla/releases/tag/v0.2.1
+
 ## [v0.2.0] — 2026-07-14 — Hiring-signal push
 
 **Release:** https://github.com/jrajath94/agentsla/releases/tag/v0.2.0
