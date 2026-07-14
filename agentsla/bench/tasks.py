@@ -122,6 +122,127 @@ def _injection_variants(tasks: list[BenchTask]) -> list[BenchTask]:
     return injected
 
 
+def load_ground_truthable_tasks() -> list[BenchTask]:
+    """Factual Q&A corpus for the live-API bench (real_llm).
+
+    The hermetic corpus (``load_tasks``) targets the deterministic
+    :class:`EchoModel` — every task carries ``expected_substring=\"<echo:\"``
+    and ``ground_truth=None`` because the echoer just prepends ``<echo:`` to
+    the task text. A real Claude (or MiniMax) model produces a helpful but
+    free-form answer that does NOT contain ``<echo:``, so the live bench
+    would record ``0/30 success`` even when the answer is correct.
+
+    This corpus inverts the design: each task is a closed-form question
+    (arithmetic, capital cities, simple facts) whose correct answer is a
+    short token the model reliably produces. ``ground_truth`` is set so
+    the report's ``verified_at_truth`` column populates with measured
+    numbers, not ``n/a``.
+
+    Distribution: 4 per domain (3+1 holdout) = 12 tasks.
+    """
+    base: list[BenchTask] = []
+
+    # --- financial_ops: arithmetic + simple accounting facts ----------------
+    finops = [
+        # (id, prompt, expected_substring, ground_truth)
+        ("real-finops-001", "Compute 17 + 25. Reply with only the number.", "42", "42"),
+        ("real-finops-002", "Compute 144 / 12. Reply with only the number.", "12", "12"),
+        ("real-finops-003", "Compute (8 * 7) - 10. Reply with only the number.", "46", "46"),
+        ("real-finops-004", "Compute 2^10. Reply with only the number.", "1024", "1024"),
+    ]
+    for i, (tid, prompt, expected, truth) in enumerate(finops):
+        base.append(
+            BenchTask(
+                task_id=tid,
+                domain="financial_ops",
+                text=prompt,
+                expected_substring=expected,
+                ground_truth=truth,
+                holdout=(i % 4 == 3),
+            )
+        )
+
+    # --- incident_triage: short factual definitions --------------------------
+    incident = [
+        (
+            "real-incident-001",
+            "What HTTP status code indicates 'Too Many Requests'? Reply with just the number.",
+            "429",
+            "429",
+        ),
+        (
+            "real-incident-002",
+            "What does the acronym SLA stand for in incident management? Reply with the three words separated by spaces.",
+            "Service Level Agreement",
+            "Service Level Agreement",
+        ),
+        (
+            "real-incident-003",
+            "What Kubernetes object is used to expose a service outside the cluster? Reply with the singular noun.",
+            "Ingress",
+            "Ingress",
+        ),
+        (
+            "real-incident-004",
+            "What metric measures the fraction of requests served within an SLO threshold? Reply with two words.",
+            "goodput",
+            "goodput",
+        ),
+    ]
+    for i, (tid, prompt, expected, truth) in enumerate(incident):
+        base.append(
+            BenchTask(
+                task_id=tid,
+                domain="incident_triage",
+                text=prompt,
+                expected_substring=expected,
+                ground_truth=truth,
+                holdout=(i % 4 == 3),
+            )
+        )
+
+    # --- doc_qa: capital cities + well-known facts ---------------------------
+    docqa = [
+        (
+            "real-docqa-001",
+            "What is the capital of France? Reply with the city name only.",
+            "Paris",
+            "Paris",
+        ),
+        (
+            "real-docqa-002",
+            "What is the capital of Japan? Reply with the city name only.",
+            "Tokyo",
+            "Tokyo",
+        ),
+        (
+            "real-docqa-003",
+            "In what year did the Apollo 11 lunar module land on the Moon? Reply with the year only.",
+            "1969",
+            "1969",
+        ),
+        (
+            "real-docqa-004",
+            "What is the chemical symbol for gold? Reply with the symbol only.",
+            "Au",
+            "Au",
+        ),
+    ]
+    for i, (tid, prompt, expected, truth) in enumerate(docqa):
+        base.append(
+            BenchTask(
+                task_id=tid,
+                domain="doc_qa",
+                text=prompt,
+                expected_substring=expected,
+                ground_truth=truth,
+                holdout=(i % 4 == 3),
+            )
+        )
+
+    return base
+
+
 def load_tasks(*, include_injection: bool = True) -> list[BenchTask]:
     """Return the full bench corpus.
 
