@@ -66,11 +66,11 @@ all = [
 ]
 
 [project.scripts]
-agentsla = "agentsla.cli:app"
+agentsla = "agentsla.__main__:main"
 
 [project.urls]
-Repository = "https://github.com/anthropic-research/agentsla"
-Issues = "https://github.com/anthropic-research/agentsla/issues"
+Repository = "https://github.com/jrajath94/agentsla"
+Issues = "https://github.com/jrajath94/agentsla/issues"
 
 [build-system]
 requires = ["hatchling>=1.27"]
