@@ -20,8 +20,9 @@ import pytest
 
 
 def test_real_llm_requires_api_key_or_fails_clean(monkeypatch, tmp_path: Path) -> None:
-    """No ANTHROPIC_API_KEY → clear error, no parquet written."""
+    """No ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN → clear error, no parquet written."""
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
     from agentsla.bench.real_llm import run_real_llm_bench
 
     with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
@@ -59,8 +60,8 @@ def test_real_llm_schema_matches_parquet(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_real_llm_emits_not_yet_measured_marker_when_no_key(tmp_path: Path) -> None:
-    """No key → CLI exits 2 with a clear ANTHROPIC_API_KEY message; no parquet produced."""
-    env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
+    """No key (either env var) → CLI exits 2 with a clear ANTHROPIC_API_KEY message; no parquet produced."""
+    env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
     out_path = tmp_path / "should_not_exist.parquet"
     result = subprocess.run(  # noqa: S603 — controlled subprocess for CLI smoke
         [
@@ -124,3 +125,107 @@ def test_real_llm_row_dataclass_serializes_to_arrow(tmp_path: Path) -> None:
     roundtrip = pq.read_table(out_path).to_pylist()
     assert roundtrip[0]["task_id"] == "finops-001"
     assert roundtrip[0]["model_id"] == "claude-haiku-4-5-20251001"
+
+
+class TestResolveApiKey:
+    def test_explicit_arg_wins(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Explicit api_key argument takes precedence over every env var."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env-api")
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "sk-env-auth")
+        from agentsla.bench.real_llm import _resolve_api_key
+
+        assert _resolve_api_key("sk-explicit") == "sk-explicit"
+
+    def test_anthropic_api_key_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """ANTHROPIC_API_KEY is the primary env var (the SDK-native name)."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env-api")
+        monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+        from agentsla.bench.real_llm import _resolve_api_key
+
+        assert _resolve_api_key(None) == "sk-env-api"
+
+    def test_anthropic_auth_token_fallback(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """ANTHROPIC_AUTH_TOKEN is the secondary fallback (gateway-style auth)."""
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "sk-env-auth")
+        from agentsla.bench.real_llm import _resolve_api_key
+
+        assert _resolve_api_key(None) == "sk-env-auth"
+
+    def test_missing_key_raises_runtime_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """No key anywhere → RuntimeError naming both env vars."""
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+        from agentsla.bench.real_llm import _resolve_api_key
+
+        with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
+            _resolve_api_key(None)
+
+
+class TestBothModesEmitted:
+    def test_parquet_contains_both_naked_and_wrapped(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """PRD F3 requires naked-vs-wrapped comparison. Run with mocked Claude
+        that echoes the prompt; assert both modes appear in the parquet.
+        """
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+
+        def _fake_call(prompt: str, *, model: str, api_key: str | None) -> str:
+            return f"<echo:{prompt[:30]}>"
+
+        from agentsla.bench.real_llm import run_real_llm_bench
+
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=_fake_call):
+            out_path = tmp_path / "both_modes.parquet"
+            run_real_llm_bench(tasks_per_domain=1, seeds=1, out_path=out_path)
+
+        table = pq.read_table(out_path)
+        modes = set(table.column("mode").to_pylist())
+        assert modes == {"naked", "wrapped"}, f"parquet must carry both modes for honest comparison; got {modes}"
+        # Row count must be 2 * (tasks_per_domain * 3 domains * seeds).
+        assert table.num_rows == 2 * 1 * 3 * 1, f"expected 6 rows (2 modes * 1 task * 3 domains * 1 seed); got {table.num_rows}"
+
+    def test_gate_denies_response_containing_aws_key(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Wrapped row with text containing an AWS key pattern → gate_passed=False,
+        success=False (policy denial is the verdict).
+        """
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+
+        def _fake_call(prompt: str, *, model: str, api_key: str | None) -> str:
+            # Echo with an embedded AWS key -- egress regex AKIA[0-9A-Z]{16} should fire.
+            return "The result is AKIAIOSFODNN7EXAMPLE which is the example key."
+
+        from agentsla.bench.real_llm import run_real_llm_bench
+
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=_fake_call):
+            out_path = tmp_path / "deny.parquet"
+            run_real_llm_bench(tasks_per_domain=1, seeds=1, out_path=out_path)
+
+        rows = pq.read_table(out_path).to_pylist()
+        wrapped = [r for r in rows if r["mode"] == "wrapped"]
+        assert wrapped, "wrapped rows must exist"
+        for r in wrapped:
+            assert r["gate_passed"] is False, f"gate must deny AWS-key response; got row: {r}"
+            assert r["success"] is False, "denied response cannot be a success"
+        # Naked rows for the same tasks must still report gate_passed=False (no gate ran).
+        naked = [r for r in rows if r["mode"] == "naked"]
+        for r in naked:
+            assert r["gate_passed"] is False, "naked row has no gate; gate_passed must be False"
+
+    def test_gate_allows_clean_response(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Wrapped row with no egress-triggering pattern → gate_passed=True."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+
+        def _fake_call(prompt: str, *, model: str, api_key: str | None) -> str:
+            return "The sum is 42."
+
+        from agentsla.bench.real_llm import run_real_llm_bench
+
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=_fake_call):
+            out_path = tmp_path / "allow.parquet"
+            run_real_llm_bench(tasks_per_domain=1, seeds=1, out_path=out_path)
+
+        rows = pq.read_table(out_path).to_pylist()
+        wrapped = [r for r in rows if r["mode"] == "wrapped"]
+        assert wrapped, "wrapped rows must exist"
+        for r in wrapped:
+            assert r["gate_passed"] is True, f"clean text must pass the gate; got row: {r}"

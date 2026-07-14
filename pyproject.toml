@@ -38,6 +38,9 @@ metrics = [
 bench = [
   "typer==0.26.8",
   "rich==15.0.0",
+  # `bench-real` (live API runs) calls Anthropic / an Anthropic-compatible
+  # gateway; keep the SDK optional so the hermetic install stays hermetic.
+  "anthropic>=0.40",
 ]
 # v0.2: matplotlib-driven figures for REPORT.md + README (figures CLI).
 # numpy pinned <2 because matplotlib's transitive numpy>=2.5 stub uses Python
@@ -176,3 +179,18 @@ exclude_lines = [
 show_missing = true
 skip_covered = false
 fail_under = 85
+
+# ---------------------------------------------------------------------------
+# Dev tooling (PEP 735 dependency groups)
+# ---------------------------------------------------------------------------
+# CI installs these via `uv sync --group dev` so the lint and type-check jobs
+# don't rely on system-level `ruff` / `mypy` (`uv run ruff` from `uv sync
+# --extra all` alone fails — neither package is in any project extra). Pinned
+# to the versions verified locally; bump in lock when you can review the
+# impact. Mypy 2.2.x is the last line that ships Python 3.11-compatible
+# stubs for the duckdb + pyarrow surface this project imports.
+[dependency-groups]
+dev = [
+  "ruff==0.15.20",
+  "mypy==2.2.0",
+]  # pragma: allowlist dev tooling

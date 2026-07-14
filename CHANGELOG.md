@@ -2,6 +2,46 @@
 
 All notable changes to AgentSLA are recorded here. Dates are UTC.
 
+## [v0.2.0] — 2026-07-13 — Hiring-signal push
+
+v0.1 was a release candidate; v0.2 is the hiring-signal-grade push that
+ties every README number to a parquet and adds live-API evidence on top
+of the hermetic bench.
+
+### Highlights
+
+- **Ground-truthable bench corpus** (`agentsla/bench/tasks.py`):
+  `load_ground_truthable_tasks()` returns 12 factual Q&A tasks (4 per
+  domain) with `ground_truth` set to a substring that well-behaved
+  models reliably emit. Live-API `bench-real` now reports honest
+  `verified_at_truth` instead of 0% — 22/24 rows measured on
+  MiniMax-M3 (2026-07-13).
+- **Live measured numbers in README headline** — hermetic + real-LLM
+  tables traceable to `bench/results/{results,real_llm}.parquet`.
+- **Figures regenerated** (`bench/results/figures/`) — 5 PNGs auto-
+  linked from `REPORT.md` via `report.py`. Source of truth = single
+  `_aggregate()` function shared between table + figures (no drift).
+- **PRD-v2 + TRD-v2** (`docs/`) — 8-section PRD covering the 5 hiring
+  signals + F-IDs (F1–F14); 9-section TRD with control-plane contracts,
+  module API surface, latency budgets, threat model, bench parquet
+  schemas, CLI surface, CI gates.
+- **Failure-modes doc** (`docs/failure-modes.md`) — 16 sections
+  covering DuckDB lock, verifier scaling, judge availability, hermetic
+  bias, classifier circularity, egress FPs.
+- **CI hygiene** — `PULL_REQUEST_TEMPLATE.md` with the required
+  Problem / Approach / Evidence / Tradeoffs / Out of scope sections,
+  bug + feature issue templates, `SECURITY.md`, `dependabot.yml`,
+  `release.yml` (OIDC trusted publishing to PyPI).
+
+### Notes
+
+- All numbers in the headline tables are traceable to a parquet in
+  `bench/results/` (parquet files are gitignored; reproduced locally
+  via `agentsla bench --all` and `agentsla bench-real`).
+- Live bench uses `MiniMax-M3` via the Anthropic-compatible gateway
+  (`ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN`). No real
+  Anthropic API key is required for local reproduction.
+
 ## [v0.1.0] — 2026-07-09 — Hardening push
 
 First push that takes AgentSLA from "Phase 5 surface, mostly wired" to

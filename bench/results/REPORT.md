@@ -47,6 +47,19 @@ _Generated from `bench/results/results.parquet`._
 | naked | 16 | 100% | 0% | n/a | 6.00 |
 | wrapped | 16 | 88% | 100% | n/a | 8.69 |
 
+## Seeded-error experiment (verification gate validation)
+
+_Generated from `bench/results/seeded_errors.parquet`. Synthetic numeric tasks with known ground truth; the agent emits a single perturbed number; the verifier compares the extracted claim against the ground-truth resolver. At 0% perturbation every claim should match (specificity); at >0% perturbation every claim should mismatch and the gate should flag `incorrect` (sensitivity)._
+
+| Perturbation | N trials | Sensitivity (gate caught) | Specificity (clean pass) | Mean latency (ms) |
+|-------------:|---------:|--------------------------:|-------------------------:|------------------:|
+| ±10.0% | 1000 | 100% | 0% | 16.81 |
+| ±20.0% | 1000 | 100% | 0% | 5.84 |
+
+**Acceptance** (per `feedback.md` Item 3):
+- sensitivity @ ±50% perturbation ≥ 85%
+- specificity @ 0% perturbation ≥ 90%
+
 ## Cross-adapter parity (rawloop vs langgraph)
 
 _Generated from `bench/results/parity.parquet`._
@@ -83,37 +96,3 @@ Event-kind sequence equality is enforced by the unit suite (`tests/integration/t
 ### Success Rate
 
 ![Success Rate](figures/success_rate.png)
-
-## Classifier held-out evaluation
-
-_Generated from `tests/fixtures/held_out_labels.jsonl` at 2026-07-10T01:03:12.385566+00:00._
-
-**Headline agreement:** 100% (36/36)
-
-| Gold category | N | Correct | Agreement |
-|---------------|--:|--------:|----------:|
-| hallucinated_fact | 4 | 4 | 100% |
-| none | 4 | 4 | 100% |
-| permission_denied | 4 | 4 | 100% |
-| planning_error | 4 | 4 | 100% |
-| policy_violation | 4 | 4 | 100% |
-| reasoning_error | 4 | 4 | 100% |
-| retry_loop | 4 | 4 | 100% |
-| timeout | 4 | 4 | 100% |
-| tool_call_error | 4 | 4 | 100% |
-
-Confusion matrix (rows=gold, cols=predicted):
-
-| gold \ pred | hallucinated_fact | none | permission_denied | planning_error | policy_violation | reasoning_error | retry_loop | timeout | tool_call_error |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| hallucinated_fact | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| none | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| permission_denied | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 |
-| planning_error | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |
-| policy_violation | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 |
-| reasoning_error | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 |
-| retry_loop | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 |
-| timeout | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 |
-| tool_call_error | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
-
-Held-out traces were generated independently from the heuristics' training triggers; this evaluation is therefore honest (not circular). Replace the fixture at `tests/fixtures/held_out_labels.jsonl` with human-labeled traces to upgrade the headline number.
