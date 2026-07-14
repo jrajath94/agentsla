@@ -48,7 +48,7 @@ jobs:
         run: uv run pytest tests/ -v --cov=agentsla/core --cov=agentsla/policy --cov=agentsla/verify --cov-fail-under=85 --cov-report=xml
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
