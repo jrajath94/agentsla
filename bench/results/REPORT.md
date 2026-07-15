@@ -10,27 +10,27 @@ _Generated from `bench/results/results.parquet`._
 | Gate passed | 0% | 100% | +100% |
 | Verified at truth | n/a | n/a | — |
 | Injection resistance | 0% | 100% | +100% |
-| p95 latency (ms) | 6.02 | 8.52 | +2.50 (+41.6%) |
-| Mean latency (ms) | 5.19 | 7.12 | +1.93 |
+| p95 latency (ms) | 5.97 | 8.15 | +2.18 (+36.5%) |
+| Mean latency (ms) | 5.37 | 6.94 | +1.57 |
 | N runs | 70 | 70 | — |
 
 ## Per-domain breakdown
 
 | Domain | Mode | Success | Gate passed | Verified@truth | Inj resist | p95 (ms) |
 |--------|------|--------:|------------:|---------------:|-----------:|---------:|
-| financial_ops | naked | 100% | 0% | n/a | 0% | 5.73 |
-| financial_ops | wrapped | 67% | 100% | n/a | 100% | 7.79 |
-| incident_triage | naked | 100% | 0% | n/a | 100% | 5.54 |
-| incident_triage | wrapped | 100% | 100% | n/a | 100% | 9.76 |
-| doc_qa | naked | 100% | 0% | n/a | 100% | 6.10 |
-| doc_qa | wrapped | 100% | 100% | n/a | 100% | 8.10 |
+| financial_ops | naked | 100% | 0% | n/a | 0% | 6.10 |
+| financial_ops | wrapped | 67% | 100% | n/a | 100% | 9.06 |
+| incident_triage | naked | 100% | 0% | n/a | 100% | 5.92 |
+| incident_triage | wrapped | 100% | 100% | n/a | 100% | 7.88 |
+| doc_qa | naked | 100% | 0% | n/a | 100% | 5.90 |
+| doc_qa | wrapped | 100% | 100% | n/a | 100% | 8.15 |
 
 ## Holdout subset (excluded from dev tuning)
 
 | Mode | N | Success | Gate passed | Verified@truth | p95 (ms) |
 |------|--:|--------:|------------:|---------------:|---------:|
-| naked | 16 | 100% | 0% | n/a | 5.73 |
-| wrapped | 16 | 88% | 100% | n/a | 7.96 |
+| naked | 16 | 100% | 0% | n/a | 5.92 |
+| wrapped | 16 | 88% | 100% | n/a | 7.88 |
 
 ## Seeded-error experiment (verification gate validation)
 
@@ -38,8 +38,8 @@ _Generated from `bench/results/seeded_errors.parquet`. Synthetic numeric tasks w
 
 | Perturbation | N trials | Sensitivity (gate caught) | Specificity (clean pass) | Mean latency (ms) |
 |-------------:|---------:|--------------------------:|-------------------------:|------------------:|
-| ±0.0% | 100 | 100% | 100% | 3.48 |
-| ±50.0% | 100 | 100% | 0% | 3.45 |
+| ±0.0% | 100 | 100% | 100% | 4.38 |
+| ±50.0% | 100 | 100% | 0% | 3.30 |
 
 **Acceptance** (per `feedback.md` Item 3):
 - sensitivity @ ±50% perturbation ≥ 85%

@@ -4,8 +4,8 @@ _Generated from `bench/results/seeded_errors.parquet`. Synthetic numeric tasks w
 
 | Perturbation | N trials | Sensitivity (gate caught) | Specificity (clean pass) | Mean latency (ms) |
 |-------------:|---------:|--------------------------:|-------------------------:|------------------:|
-| ±0.0% | 100 | 100% | 100% | 3.48 |
-| ±50.0% | 100 | 100% | 0% | 3.45 |
+| ±0.0% | 100 | 100% | 100% | 4.38 |
+| ±50.0% | 100 | 100% | 0% | 3.30 |
 
 **Acceptance** (per `feedback.md` Item 3):
 - sensitivity @ ±50% perturbation ≥ 85%
