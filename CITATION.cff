@@ -1,0 +1,49 @@
+cff-version: 1.2.0
+message: "If you use AgentSLA in academic work, please cite the underlying reliability primitives and the policy/verification contracts in WRITEUP.md."
+title: "AgentSLA"
+type: software
+date-released: 2026-07-15
+version: 1.0.0
+license: MIT
+authors:
+  - family-names: "Bosco"
+    given-names: "Rajath John"
+    affiliation: "Independent"
+    orcid: ""
+repository-code: "https://github.com/jrajath94/agentsla"
+url: "https://github.com/jrajath94/agentsla"
+keywords:
+  - agent-reliability
+  - tool-calling
+  - llm-sla
+  - verification-gate
+  - policy-gate
+  - replay
+  - deterministic-trace
+references:
+  - type: software
+    title: "Claude Agent SDK"
+    authors:
+      - family-names: "Anthropic"
+        given-names: ""
+    version: "claude-agent-sdk 0.2.x"
+    year: 2025
+    url: "https://docs.anthropic.com/en/api/agent-sdk/overview"
+  - type: software
+    title: "LangGraph"
+    authors:
+      - family-names: "LangChain"
+        given-names: ""
+    version: "langgraph 0.x"
+    year: 2025
+    url: "https://langchain-ai.github.io/langgraph/"
+  - type: article
+    title: "Prometheus — From metrics to insight"
+    authors:
+      - family-names: "Bjoern Rabenstein"
+        given-names: ""
+      - family-names: "Julius Volz"
+        given-names: ""
+    journal: "Prometheus documentation"
+    year: 2024
+    url: "https://prometheus.io/docs/introduction/overview/"
