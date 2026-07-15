@@ -27,6 +27,7 @@ import random
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 # ---------------------------------------------------------------------------
@@ -38,7 +39,7 @@ _RNG = random.Random(20260709)  # noqa: S311 — deterministic seed for byte-sta
 _TS0 = datetime(2026, 7, 1, 12, 0, 0, tzinfo=UTC)
 
 
-def _msg(trace_id, seq: int, role: str, content: str, model_id: str = "echo-1") -> dict:
+def _msg(trace_id: Any, seq: int, role: str, content: str, model_id: str = "echo-1") -> dict[str, Any]:
     return {
         "kind": "model_message",
         "msg_id": str(uuid4()),
@@ -52,7 +53,7 @@ def _msg(trace_id, seq: int, role: str, content: str, model_id: str = "echo-1") 
     }
 
 
-def _call(trace_id, seq: int, tool: str, args: dict, parent_msg_id: str) -> dict:
+def _call(trace_id: Any, seq: int, tool: str, args: dict[str, Any], parent_msg_id: str) -> dict[str, Any]:
     return {
         "kind": "tool_call",
         "call_id": str(uuid4()),
@@ -66,7 +67,15 @@ def _call(trace_id, seq: int, tool: str, args: dict, parent_msg_id: str) -> dict
     }
 
 
-def _result(trace_id, seq: int, tool: str, result, is_error: bool = False, error: str | None = None, call_id: str | None = None) -> dict:
+def _result(
+    trace_id: Any,
+    seq: int,
+    tool: str,
+    result: Any,
+    is_error: bool = False,
+    error: str | None = None,
+    call_id: str | None = None,
+) -> dict[str, Any]:
     return {
         "kind": "tool_result",
         "call_id": call_id or str(uuid4()),
@@ -81,7 +90,7 @@ def _result(trace_id, seq: int, tool: str, result, is_error: bool = False, error
     }
 
 
-def _wrap(events: list[dict], final_answer: str, task_id: str) -> dict:
+def _wrap(events: list[dict[str, Any]], final_answer: str, task_id: str) -> dict[str, Any]:
     return {
         "trace_id": str(uuid4()),
         "task_id": task_id,
@@ -91,7 +100,7 @@ def _wrap(events: list[dict], final_answer: str, task_id: str) -> dict:
     }
 
 
-def gen_reasoning_error() -> dict:
+def gen_reasoning_error() -> dict[str, Any]:
     """Anchor collision on a 3-word anchor (heuristics only anchor on 2 words)."""
     trace_id = uuid4()
     user = _msg(trace_id, 0, "user", "What's the total?")
@@ -103,7 +112,7 @@ def gen_reasoning_error() -> dict:
     return row
 
 
-def gen_policy_violation() -> dict:
+def gen_policy_violation() -> dict[str, Any]:
     """Egress hit, but using a tool name NOT in the heuristics' training tests."""
     trace_id = uuid4()
     user = _msg(trace_id, 0, "user", "fetch secret")
@@ -116,7 +125,7 @@ def gen_policy_violation() -> dict:
     return row
 
 
-def gen_tool_call_error() -> dict:
+def gen_tool_call_error() -> dict[str, Any]:
     """Tool name that is clearly NOT in any policy.allowed_tools."""
     trace_id = uuid4()
     user = _msg(trace_id, 0, "user", "execute shell command")
@@ -127,7 +136,7 @@ def gen_tool_call_error() -> dict:
     return row
 
 
-def gen_retry_loop() -> dict:
+def gen_retry_loop() -> dict[str, Any]:
     """4 consecutive identical calls — exceeds RETRY_LOOP_THRESHOLD=3."""
     trace_id = uuid4()
     user = _msg(trace_id, 0, "user", "retry please")
@@ -143,7 +152,7 @@ def gen_retry_loop() -> dict:
     return row
 
 
-def gen_planning_error() -> dict:
+def gen_planning_error() -> dict[str, Any]:
     """ToolResult.error AND no Verdict event."""
     trace_id = uuid4()
     user = _msg(trace_id, 0, "user", "try this")
@@ -155,7 +164,7 @@ def gen_planning_error() -> dict:
     return row
 
 
-def gen_timeout() -> dict:
+def gen_timeout() -> dict[str, Any]:
     """start_ts → end_ts delta > 120s. We bake the delta into the events."""
     trace_id = uuid4()
     user = _msg(trace_id, 0, "user", "long task")
@@ -167,7 +176,7 @@ def gen_timeout() -> dict:
     return row
 
 
-def gen_permission_denied() -> dict:
+def gen_permission_denied() -> dict[str, Any]:
     """3 DENYs of the same tool → exceeds PERMISSION_DENIED_THRESHOLD=2."""
     trace_id = uuid4()
     user = _msg(trace_id, 0, "user", "denied repeatedly")
@@ -177,7 +186,7 @@ def gen_permission_denied() -> dict:
     return row
 
 
-def gen_hallucinated_fact() -> dict:
+def gen_hallucinated_fact() -> dict[str, Any]:
     """Verdict.verified=False, no other trigger should fire."""
     trace_id = uuid4()
     user = _msg(trace_id, 0, "user", "compute the answer")
@@ -198,7 +207,7 @@ def gen_hallucinated_fact() -> dict:
     return row
 
 
-def gen_none() -> dict:
+def gen_none() -> dict[str, Any]:
     """No trigger should fire. Short clean trace."""
     trace_id = uuid4()
     user = _msg(trace_id, 0, "user", "simple query")
@@ -224,7 +233,7 @@ _GENERATORS = [
 def build_fixture(out_path: Path, *, repeat: int = 4) -> int:
     """Write ≥30 rows by repeating each generator ``repeat`` times."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    rows: list[dict] = []
+    rows: list[dict[str, Any]] = []
     for _ in range(repeat):
         for gen in _GENERATORS:
             rows.append(gen())
@@ -250,7 +259,7 @@ def build_fixture(out_path: Path, *, repeat: int = 4) -> int:
 # "X% agreement on real traces" number when a key is available.
 
 
-def _tag_synthetic(rows: list[dict]) -> list[dict]:
+def _tag_synthetic(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Stamp every row with ``synthetic=true`` for provenance tracking."""
     for r in rows:
         r["synthetic"] = True
@@ -258,7 +267,7 @@ def _tag_synthetic(rows: list[dict]) -> list[dict]:
     return rows
 
 
-def _tag_real(rows: list[dict], *, model: str) -> list[dict]:
+def _tag_real(rows: list[dict[str, Any]], *, model: str) -> list[dict[str, Any]]:
     """Stamp rows as ``synthetic=false`` and record the Claude model id."""
     for r in rows:
         r["synthetic"] = False
@@ -278,7 +287,7 @@ def build_synthetic_held_out_fixture(
     the original ``build_fixture``; renamed for clarity under v1.
     """
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    rows: list[dict] = []
+    rows: list[dict[str, Any]] = []
     for _ in range(repeat):
         for gen in _GENERATORS:
             rows.append(gen())
@@ -296,7 +305,7 @@ def _call_claude(prompt: str, *, model: str, api_key: str | None) -> str:
     if not effective_key:
         raise RuntimeError("ANTHROPIC_API_KEY required for real held-out fixture (or pass api_key=...)")
     try:
-        import anthropic  # type: ignore[import-untyped]
+        import anthropic
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError(f"anthropic package not installed: {exc}") from exc
     client = anthropic.Anthropic(api_key=effective_key)
@@ -339,7 +348,7 @@ def build_real_held_out_fixture(
     # Claude response, then stamp it with the gold label. We re-use the
     # synthetic generator shape so the eval CLI doesn't need a special
     # branch for "real" rows.
-    rows: list[dict] = []
+    rows: list[dict[str, Any]] = []
     for gen_idx, gen in enumerate(_GENERATORS):
         for i in range(n_per_category):
             base = gen()

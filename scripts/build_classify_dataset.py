@@ -27,6 +27,7 @@ import json
 import random
 import uuid
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUT_PATH = REPO_ROOT / "tests" / "fixtures" / "classify" / "labels.jsonl"
@@ -38,11 +39,11 @@ def _uid() -> str:
     return str(uuid.UUID(int=random.getrandbits(128)))
 
 
-def _events_tool_call(tool: str, args: dict, seq: int, tid: str) -> dict:
+def _events_tool_call(tool: str, args: dict[str, Any], seq: int, tid: str) -> dict[str, Any]:
     return {"kind": "tool_call", "tool": tool, "args": args, "seq": seq, "trace_id": tid}
 
 
-def _events_tool_result(tool: str, error: str | None, seq: int, tid: str, call_idx: int) -> dict:
+def _events_tool_result(tool: str, error: str | None, seq: int, tid: str, call_idx: int) -> dict[str, Any]:
     return {
         "kind": "tool_result",
         "tool": tool,
@@ -54,7 +55,7 @@ def _events_tool_result(tool: str, error: str | None, seq: int, tid: str, call_i
     }
 
 
-def _events_verdict(verified: bool, coverage: float, seq: int, tid: str) -> dict:
+def _events_verdict(verified: bool, coverage: float, seq: int, tid: str) -> dict[str, Any]:
     return {
         "kind": "verdict",
         "verified": verified,
@@ -64,7 +65,7 @@ def _events_verdict(verified: bool, coverage: float, seq: int, tid: str) -> dict
     }
 
 
-def _events_model_message(content: str, seq: int, tid: str) -> dict:
+def _events_model_message(content: str, seq: int, tid: str) -> dict[str, Any]:
     return {
         "kind": "model_message",
         "role": "assistant",
@@ -76,7 +77,7 @@ def _events_model_message(content: str, seq: int, tid: str) -> dict:
     }
 
 
-def _success_traces(n: int = 10) -> list[dict]:
+def _success_traces(n: int = 10) -> list[dict[str, Any]]:
     out = []
     for i in range(n):
         tid = _uid()
@@ -97,7 +98,7 @@ def _success_traces(n: int = 10) -> list[dict]:
     return out
 
 
-def _hallucinated_traces(n: int = 8) -> list[dict]:
+def _hallucinated_traces(n: int = 8) -> list[dict[str, Any]]:
     out = []
     for i in range(n):
         tid = _uid()
@@ -118,7 +119,7 @@ def _hallucinated_traces(n: int = 8) -> list[dict]:
     return out
 
 
-def _tool_call_error_traces(n: int = 7) -> list[dict]:
+def _tool_call_error_traces(n: int = 7) -> list[dict[str, Any]]:
     out = []
     for i in range(n):
         tid = _uid()
@@ -137,7 +138,7 @@ def _tool_call_error_traces(n: int = 7) -> list[dict]:
     return out
 
 
-def _retry_loop_traces(n: int = 7) -> list[dict]:
+def _retry_loop_traces(n: int = 7) -> list[dict[str, Any]]:
     out = []
     for i in range(n):
         tid = _uid()
@@ -159,7 +160,7 @@ def _retry_loop_traces(n: int = 7) -> list[dict]:
     return out
 
 
-def _timeout_traces(n: int = 6) -> list[dict]:
+def _timeout_traces(n: int = 6) -> list[dict[str, Any]]:
     from datetime import UTC, datetime, timedelta
 
     out = []
@@ -182,7 +183,7 @@ def _timeout_traces(n: int = 6) -> list[dict]:
     return out
 
 
-def _permission_denied_traces(n: int = 7) -> list[dict]:
+def _permission_denied_traces(n: int = 7) -> list[dict[str, Any]]:
     out = []
     for i in range(n):
         tid = _uid()
@@ -199,7 +200,7 @@ def _permission_denied_traces(n: int = 7) -> list[dict]:
     return out
 
 
-def _policy_violation_traces(n: int = 7) -> list[dict]:
+def _policy_violation_traces(n: int = 7) -> list[dict[str, Any]]:
     out = []
     for i in range(n):
         tid = _uid()
@@ -216,7 +217,7 @@ def _policy_violation_traces(n: int = 7) -> list[dict]:
     return out
 
 
-def _budget_exceeded_traces(n: int = 6) -> list[dict]:
+def _budget_exceeded_traces(n: int = 6) -> list[dict[str, Any]]:
     out = []
     for i in range(n):
         tid = _uid()
@@ -233,7 +234,7 @@ def _budget_exceeded_traces(n: int = 6) -> list[dict]:
     return out
 
 
-def _reasoning_error_traces(n: int = 7) -> list[dict]:
+def _reasoning_error_traces(n: int = 7) -> list[dict[str, Any]]:
     out = []
     for i in range(n):
         tid = _uid()
@@ -250,7 +251,7 @@ def _reasoning_error_traces(n: int = 7) -> list[dict]:
     return out
 
 
-def _planning_error_traces(n: int = 7) -> list[dict]:
+def _planning_error_traces(n: int = 7) -> list[dict[str, Any]]:
     out = []
     for i in range(n):
         tid = _uid()
@@ -270,7 +271,7 @@ def _planning_error_traces(n: int = 7) -> list[dict]:
     return out
 
 
-def _tool_response_misuse_traces(n: int = 7) -> list[dict]:
+def _tool_response_misuse_traces(n: int = 7) -> list[dict[str, Any]]:
     out = []
     for i in range(n):
         tid = _uid()
@@ -291,7 +292,7 @@ def _tool_response_misuse_traces(n: int = 7) -> list[dict]:
     return out
 
 
-def _unexpected_tool_failure_traces(n: int = 7) -> list[dict]:
+def _unexpected_tool_failure_traces(n: int = 7) -> list[dict[str, Any]]:
     out = []
     for i in range(n):
         tid = _uid()
@@ -312,7 +313,7 @@ def _unexpected_tool_failure_traces(n: int = 7) -> list[dict]:
     return out
 
 
-def _partial_completion_traces(n: int = 6) -> list[dict]:
+def _partial_completion_traces(n: int = 6) -> list[dict[str, Any]]:
     out = []
     for i in range(n):
         tid = _uid()
@@ -329,7 +330,7 @@ def _partial_completion_traces(n: int = 6) -> list[dict]:
     return out
 
 
-def _format_violation_traces(n: int = 6) -> list[dict]:
+def _format_violation_traces(n: int = 6) -> list[dict[str, Any]]:
     out = []
     for i in range(n):
         tid = _uid()
@@ -351,7 +352,7 @@ def _format_violation_traces(n: int = 6) -> list[dict]:
     return out
 
 
-def _context_overflow_traces(n: int = 6) -> list[dict]:
+def _context_overflow_traces(n: int = 6) -> list[dict[str, Any]]:
     out = []
     for i in range(n):
         tid = _uid()
@@ -369,9 +370,9 @@ def _context_overflow_traces(n: int = 6) -> list[dict]:
     return out
 
 
-def build_dataset() -> list[dict]:
+def build_dataset() -> list[dict[str, Any]]:
     random.seed(SEED)
-    ds: list[dict] = []
+    ds: list[dict[str, Any]] = []
     # 14 categories + success = 15 buckets. 100 / 15 ≈ 6.67; distribute
     # to land at exactly 100 with the wider buckets slightly bigger.
     ds.extend(_success_traces(7))  # 7
