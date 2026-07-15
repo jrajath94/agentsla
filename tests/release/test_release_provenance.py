@@ -139,16 +139,23 @@ def test_release_branch_not_ahead_of_main_on_release_tag() -> None:
     """The release branch HEAD must equal the latest release tag (catches `-f` re-points that skip commits).
 
     Equivalent to: ``git rev-parse <branch-tip>`` matches
-    ``git rev-parse <latest>``. Guards against ``git tag -f`` re-points
-    that move the tag forward without the underlying code catching up.
+    ``git rev-parse <latest>^{commit}``. Guards against ``git tag -f``
+    re-points that move the tag forward without the underlying code
+    catching up.
 
     Compares against :func:`_branch_tip_ref` (resolves to
     ``origin/<branch>`` on PR + push) so the invariant holds in both CI
     contexts. CI run :gh-run:`29428237463` demonstrated the merge-commit
     drift when this compared against HEAD; routed through the helper.
+
+    ``<tag>^{commit}`` peels an annotated tag to the underlying commit
+    so the equality comparison is commit-SHA == commit-SHA. Without the
+    peel, ``git rev-parse v1.0.0`` returns the tag-object SHA, not the
+    commit SHA — and the comparison never passes for any annotated
+    release tag.
     """
     tag = _latest_release_tag()
-    tag_sha = _run_git("rev-parse", tag)
+    tag_sha = _run_git("rev-parse", f"{tag}^{{commit}}")
     tip_sha = _run_git("rev-parse", _branch_tip_ref())
     assert tag_sha == tip_sha, (
         f"branch tip={tip_sha[:12]} != {tag}={tag_sha[:12]}. "
