@@ -103,9 +103,7 @@ def _latest_git_tag() -> str:
         semver_pairs.append(
             (tuple(int(part) for part in ver.split(".")), tag),
         )
-    assert semver_pairs, (
-        f"no released git tags found (every tag is a retraction marker): {tags}"
-    )
+    assert semver_pairs, f"no released git tags found (every tag is a retraction marker): {tags}"
     semver_pairs.sort(reverse=True)
     return semver_pairs[0][1]
 
@@ -115,9 +113,7 @@ def test_pyproject_version_matches_changelog_latest() -> None:
     pyproject_v = _read_pyproject_version()
     changelog_v = _read_changelog_latest()
     assert pyproject_v == changelog_v, (
-        f"pyproject.toml version={pyproject_v!r} != "
-        f"CHANGELOG latest=v{changelog_v!r}. "
-        "Bump one to match the other — they must stay aligned."
+        f"pyproject.toml version={pyproject_v!r} != CHANGELOG latest=v{changelog_v!r}. Bump one to match the other — they must stay aligned."
     )
 
 
