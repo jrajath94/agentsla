@@ -60,8 +60,7 @@ class TestBenchFullTarget:
     def test_bench_full_target_exists(self) -> None:
         text = _makefile_text()
         assert re.search(r"^bench-full\s*:", text, re.MULTILINE), (
-            "Makefile missing `bench-full:` target. Add one that mirrors "
-            "the CI integration check (bench + bench-seeded-errors + report)."
+            "Makefile missing `bench-full:` target. Add one that mirrors the CI integration check (bench + bench-seeded-errors + report)."
         )
 
     def test_bench_full_includes_both_bench_subcommands_and_report(self) -> None:
@@ -76,11 +75,7 @@ class TestBenchFullTarget:
             text,
             re.MULTILINE,
         )
-        assert m is not None, (
-            "Makefile has `bench-full:` but no body — add the three commands."
-        )
+        assert m is not None, "Makefile has `bench-full:` but no body — add the three commands."
         body = m.group(1)
         for needle in ("agentsla bench", "bench-seeded-errors", "agentsla report"):
-            assert needle in body, (
-                f"Makefile `bench-full` body is missing command containing {needle!r}."
-            )
+            assert needle in body, f"Makefile `bench-full` body is missing command containing {needle!r}."
