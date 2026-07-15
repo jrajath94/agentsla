@@ -2,6 +2,57 @@
 
 All notable changes to AgentSLA are recorded here. Dates are UTC.
 
+## Unreleased — Patch: standalone Prometheus exporter (`agentsla metrics serve`)
+
+The v1.0.0 Tier-1 release shipped the metric families
+(`agentsla_failures_total`, `agentsla_verify_coverage`,
+`agentsla_classify_latency_seconds`) and a Grafana dashboard that
+queries them, but no process to *serve* the metrics over HTTP
+unless a bench run was in flight with `--metrics-port N`. This
+patch closes the gap: the Grafana dashboard is now wireable without
+a bench in progress.
+
+### Added
+
+- **`agentsla metrics serve` CLI** (`agentsla/cli/metrics.py`,
+  `serve()`) — starts a long-running HTTP server (default
+  `127.0.0.1:9100`) that exposes the three AgentSLA metric
+  families on `/metrics` for Prometheus to scrape. `start_http_server`
+  from `prometheus_client` is the underlying primitive. The
+  process blocks until SIGTERM / KeyboardInterrupt, so PM2 /
+  systemd / docker are the intended lifecycle owners. Default
+  port 9100 matches the `node_exporter` convention so a single
+  Prometheus scrape config can pick AgentSLA up alongside other
+  exporters.
+- **`agentsla metrics snapshot` CLI** (same file, `snapshot()`) —
+  one-shot dump of the registry's exposition text to stdout,
+  `--format text` (default, Prometheus exposition) or
+  `--format json` (parsed family/sample structure for tooling
+  that prefers JSON). Exits 0.
+- **Wired into the unified CLI dispatcher** (`agentsla/__main__.py`)
+  — `agentsla metrics ...` now reaches the metrics module; the
+  usage banner lists `metrics` alongside the existing
+  `run,replay,bench,bench-seeded-errors,bench-real,report`.
+- **Test coverage** (`tests/unit/cli/test_metrics_cli.py`, 9 cases) —
+  pins the snapshot CLI shape (exit codes, JSON round-trip,
+  format rejection), the serve surface contract (HTTP /metrics
+  returns 200 with the three families + a populated sample), the
+  CLI dispatch wiring, and a global REGISTRY exposition-format
+  sanity check. Pinned against regression: a refactor that drops
+  the `metrics` dispatch or strips the `/metrics` route trips
+  CI.
+- **README § "Benchmarking"** documents `agentsla metrics serve`
+  / `snapshot` alongside `--metrics-port` so a reviewer wiring
+  Grafana knows the three ways to feed it. **README §
+  "Limitations"** keeps the in-process-counter caveat but adds
+  the standalone exporter path.
+
+### Source of truth
+
+- Implementation: `agentsla/cli/metrics.py` (164 lines).
+- Tests: `tests/unit/cli/test_metrics_cli.py` (9 cases).
+- Wire: `agentsla/__main__.py:32,42-44`.
+
 ## Correction log (2026-07-14)
 
 Two earlier CHANGELOG entries are retracted as of 2026-07-14.

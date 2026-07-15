@@ -174,3 +174,21 @@ jobs:
             fi
           done
           echo "bench wiring symbols OK"
+
+      # 5. Integration gate — Prometheus exporter snapshot (W7): the
+      # ``agentsla metrics snapshot`` subcommand must produce Prometheus
+      # exposition text that mentions the three metric families the
+      # Grafana dashboard queries. Catches a refactor that breaks the
+      # CLI dispatcher or strips the /metrics route without removing the
+      # dashboard that depends on it.
+      - name: Integration gate — metrics exporter snapshot
+        run: |
+          set -euo pipefail
+          out=$(uv run python -m agentsla metrics snapshot --format text)
+          for sym in agentsla_failures_total agentsla_verify_coverage agentsla_classify_latency_seconds; do
+            if ! echo "$out" | grep -q "$sym"; then
+              echo "::error file=agentsla/cli/metrics.py::snapshot missing metric family $sym"
+              exit 1
+            fi
+          done
+          echo "metrics exporter snapshot OK"

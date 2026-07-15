@@ -151,6 +151,18 @@ agentsla bench --all --metrics-port 9090
 # Then add 127.0.0.1:9090 as a scrape target in Prometheus.
 ```
 
+For a standalone metrics server (no bench running), the `agentsla metrics` subcommand serves the same `/metrics` endpoint independently:
+
+```bash
+# Long-running Prometheus exporter (default port 9100, default addr 127.0.0.1)
+agentsla metrics serve --port 9090 --addr 0.0.0.0
+# One-shot dump of the current registry (handy for debugging)
+agentsla metrics snapshot --format text
+agentsla metrics snapshot --format json | jq '.families[].name'
+```
+
+Both subcommands expose the three metric families `dashboards/grafana.json` queries (`agentsla_failures_total`, `agentsla_verify_coverage`, `agentsla_classify_latency_seconds`).
+
 The seeded-error experiment (`agentsla bench-seeded-errors`) is a separate command that validates the verification gate's catch-rate on synthetic perturbed numeric outputs. See `REPORT.md § "Seeded-error experiment"` after running it.
 
 ### Headline results (latest measured run)
@@ -212,7 +224,7 @@ Produces `success_rate.png`, `gate_passed.png`, `injection_resistance.png`, `lat
 - Deterministic replay requires deterministic tool responses. Non-deterministic services (live APIs) will show divergence under replay.
 - Policy gate runs only on declared tool calls. If an agent generates code that makes external requests outside the declared tools, this layer cannot intercept.
 - Classifier uses `StubJudge` by default — the LLM-judge stage never runs in hermetic mode. Production deployments must instantiate `Classifier(judge=ClaudeJudge())` (haiku 4.5, `$ANTHROPIC_API_KEY` required) to exercise the full two-stage pipeline.
-- Prometheus counters are in-process. The shipped bench writes to the default registry but does NOT start a `/metrics` HTTP server unless `--metrics-port N` is passed. The Grafana dashboard JSON expects live series; locally, run `python -m agentsla bench --metrics-port 9090` and add a scrape target.
+- Prometheus counters are in-process. The shipped bench writes to the default registry but does NOT start a `/metrics` HTTP server unless `--metrics-port N` is passed. The Grafana dashboard JSON expects live series; locally, run `python -m agentsla bench --metrics-port 9090` and add a scrape target. For a long-running exporter independent of bench, `agentsla metrics serve --port N` starts an HTTP server against the process-global registry — the same `/metrics` endpoint Prometheus would scrape.
 - Numeric range claims (e.g. "$4.2M-$4.5M") are parsed by the regex extractor only when the suffix multiplier is on the whole span; per-endpoint multipliers ("$4.2M-$4.5M") are not currently supported. See `docs/failure-modes.md § 6` for the regex's documented limitations.
 
 ## References

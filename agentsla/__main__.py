@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import sys
 
+from agentsla.cli import metrics as metrics_mod
 from agentsla.cli import replay as replay_mod
 from agentsla.cli import run as run_mod
 
@@ -22,7 +23,7 @@ def main(argv: list[str] | None = None) -> int:
         argv = sys.argv[1:]
     if not argv:
         print(
-            "usage: agentsla {run,replay,bench,bench-seeded-errors,bench-real,report} ...",
+            "usage: agentsla {run,replay,metrics,bench,bench-seeded-errors,bench-real,report} ...",
             file=sys.stderr,
         )
         return 1
@@ -31,6 +32,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_mod.main(rest)
     if cmd == "replay":
         return replay_mod.main(rest)
+    if cmd == "metrics":
+        return metrics_mod.main(rest)
     if cmd == "bench":
         from agentsla.bench import bench_main
 
