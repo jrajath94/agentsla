@@ -29,6 +29,8 @@ import re
 import subprocess
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 PYPROJECT = REPO_ROOT / "pyproject.toml"
 CHANGELOG = REPO_ROOT / "CHANGELOG.md"
@@ -167,8 +169,27 @@ def test_latest_git_tag_matches_changelog_latest() -> None:
     )
 
 
+_IS_PR_BUILD = os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+
+skip_on_pr = pytest.mark.skipif(
+    _IS_PR_BUILD,
+    reason=(
+        "release-consistency invariant only holds on push-to-main; "
+        "on PR builds the branch is ahead of the tag by construction"
+    ),
+)
+
+
+@skip_on_pr
 def test_no_commits_since_latest_release_tag() -> None:
-    """Zero commits on the current branch past the latest release tag."""
+    """Zero commits on the current branch past the latest release tag.
+
+    Skipped on PR builds: by construction a PR branch is ahead of the
+    latest tag (that's what the PR delivers). The invariant only
+    holds on push-to-main, after a release cut or fast-forward that
+    aligns the branch tip with the tag. Mirrors
+    :func:`test_release_provenance.test_latest_release_tag_is_ancestor_of_main`.
+    """
     tag = _latest_git_tag()
     tip = _branch_tip_ref()
     out = subprocess.run(  # noqa: S603  -- tag from our own _latest_git_tag(), not user input

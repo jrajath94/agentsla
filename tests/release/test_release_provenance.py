@@ -135,6 +135,7 @@ def test_main_has_no_commits_ahead_of_latest_release_tag() -> None:
     )
 
 
+@skip_on_pr
 def test_release_branch_not_ahead_of_main_on_release_tag() -> None:
     """The release branch HEAD must equal the latest release tag (catches `-f` re-points that skip commits).
 
