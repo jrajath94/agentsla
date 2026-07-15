@@ -26,3 +26,11 @@ updates:
       prefix: "ci"
     labels:
       - "ci"
+    groups:
+      # OpenSSF Scorecard hardening: separate security patches so they
+      # bypass the weekly batching window and land as their own PRs.
+      # `applies-to: security-updates` is the GH-recognized opt-in.
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"
