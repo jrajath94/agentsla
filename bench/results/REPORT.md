@@ -2,21 +2,6 @@
 
 _Generated from `bench/results/results.parquet`._
 
-> **Honest gap — `verified_at_truth` not measured.**
-> The hermetic `EchoModel` self-certifies but does not declare
-> task ground truths, so no run can be checked against truth.
-> To populate this column, run:
-> ```
-> ANTHROPIC_API_KEY=sk-... \
->   python -m agentsla bench-real \
->     --model claude-haiku-4-5-20251001 \
->     --tasks-per-domain 5 \
->     --out bench/results/real_llm.parquet
-> ```
-> The harness path, tests, and CLI are real (see
-> `agentsla/bench/real_llm.py` + `tests/unit/bench/test_real_llm.py`);
-> only the live numbers are missing.
-
 ## Headline: naked vs wrapped
 
 | Metric | Naked | Wrapped | Delta |
@@ -25,27 +10,27 @@ _Generated from `bench/results/results.parquet`._
 | Gate passed | 0% | 100% | +100% |
 | Verified at truth | n/a | n/a | — |
 | Injection resistance | 0% | 100% | +100% |
-| p95 latency (ms) | 6.41 | 7.50 | +1.08 (+16.9%) |
-| Mean latency (ms) | 4.97 | 6.39 | +1.42 |
+| p95 latency (ms) | 6.02 | 8.52 | +2.50 (+41.6%) |
+| Mean latency (ms) | 5.19 | 7.12 | +1.93 |
 | N runs | 70 | 70 | — |
 
 ## Per-domain breakdown
 
 | Domain | Mode | Success | Gate passed | Verified@truth | Inj resist | p95 (ms) |
 |--------|------|--------:|------------:|---------------:|-----------:|---------:|
-| financial_ops | naked | 100% | 0% | n/a | 0% | 6.41 |
-| financial_ops | wrapped | 67% | 100% | n/a | 100% | 7.29 |
+| financial_ops | naked | 100% | 0% | n/a | 0% | 5.73 |
+| financial_ops | wrapped | 67% | 100% | n/a | 100% | 7.79 |
 | incident_triage | naked | 100% | 0% | n/a | 100% | 5.54 |
-| incident_triage | wrapped | 100% | 100% | n/a | 100% | 7.42 |
-| doc_qa | naked | 100% | 0% | n/a | 100% | 5.54 |
-| doc_qa | wrapped | 100% | 100% | n/a | 100% | 7.57 |
+| incident_triage | wrapped | 100% | 100% | n/a | 100% | 9.76 |
+| doc_qa | naked | 100% | 0% | n/a | 100% | 6.10 |
+| doc_qa | wrapped | 100% | 100% | n/a | 100% | 8.10 |
 
 ## Holdout subset (excluded from dev tuning)
 
 | Mode | N | Success | Gate passed | Verified@truth | p95 (ms) |
 |------|--:|--------:|------------:|---------------:|---------:|
-| naked | 16 | 100% | 0% | n/a | 5.82 |
-| wrapped | 16 | 88% | 100% | n/a | 6.86 |
+| naked | 16 | 100% | 0% | n/a | 5.73 |
+| wrapped | 16 | 88% | 100% | n/a | 7.96 |
 
 ## Seeded-error experiment (verification gate validation)
 
