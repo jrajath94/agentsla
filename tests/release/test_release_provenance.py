@@ -44,6 +44,18 @@ def _latest_release_tag() -> str:
     return _latest_git_tag()
 
 
+def _branch_tip_ref() -> str:
+    """Reuse the consistency test's branch-tip resolver.
+
+    PR-build HEAD = synthetic merge commit; this resolves to
+    ``origin/<branch>`` so the invariant compares against the actual
+    branch tip in both ``pull_request`` and ``push`` events.
+    """
+    from tests.release.test_release_consistency import _branch_tip_ref as _resolve
+
+    return _resolve()
+
+
 def _run_git(*args: str) -> str:
     return subprocess.run(  # noqa: S603 -- args are literal git invocations, not user-controlled
         ["git", *args],  # noqa: S607 -- literal "git"
@@ -126,17 +138,20 @@ def test_main_has_no_commits_ahead_of_latest_release_tag() -> None:
 def test_release_branch_not_ahead_of_main_on_release_tag() -> None:
     """The release branch HEAD must equal the latest release tag (catches `-f` re-points that skip commits).
 
-    Equivalent to: ``git rev-parse HEAD`` on the current branch matches
+    Equivalent to: ``git rev-parse <branch-tip>`` matches
     ``git rev-parse <latest>``. Guards against ``git tag -f`` re-points
     that move the tag forward without the underlying code catching up.
 
-    Runs on both PR + push builds: HEAD (branch tip) is comparable in
-    both contexts (PR's HEAD is the branch tip after the merge-base
-    resolves; push's HEAD IS the branch tip directly).
+    Compares against :func:`_branch_tip_ref` (resolves to
+    ``origin/<branch>`` on PR + push) so the invariant holds in both CI
+    contexts. CI run :gh-run:`29428237463` demonstrated the merge-commit
+    drift when this compared against HEAD; routed through the helper.
     """
     tag = _latest_release_tag()
     tag_sha = _run_git("rev-parse", tag)
-    head_sha = _run_git("rev-parse", "HEAD")
-    assert tag_sha == head_sha, (
-        f"HEAD={head_sha[:12]} != {tag}={tag_sha[:12]}. Either re-tag at HEAD (`git tag -f {tag} HEAD`) or commit on top of the tag."
+    tip_sha = _run_git("rev-parse", _branch_tip_ref())
+    assert tag_sha == tip_sha, (
+        f"branch tip={tip_sha[:12]} != {tag}={tag_sha[:12]}. "
+        f"Either re-tag at branch tip (`git tag -f {tag} {_branch_tip_ref()}`) "
+        f"or commit on top of the tag."
     )
