@@ -1,75 +1,14 @@
-# Byte-compiled / optimized / DLL files
+# Byte-compiled / optimized
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyd
+*.pyo
 
 # Distribution / packaging
 build/
 dist/
-*.egg-info/
-*.egg
-
-# Virtual environments
-.venv/
-venv/
-env/
-
-# uv
-.uv/
-
-# Testing / coverage
-.pytest_cache/
-.coverage
-.coverage.*
-htmlcov/
-coverage.xml
-
-# mypy / ruff
-.mypy_cache/
-.ruff_cache/
-
-# DuckDB / Parquet runtime artifacts (test fixtures and trace stores live outside the repo)
-*.duckdb
-*.duckdb.wal
-*.parquet
-.traces/
-
-# Editor / OS
-.vscode/
-.idea/
-.DS_Store
-*.swp
-*.log
-.env
-suggestions/
-
-# Planning & documentation (no planning files in public repo)
-.planning/
-MASTER_EXECUTION_PROMPT_CLAUDE.md
-*_Prompt*.md
-*_Brief*.md
-*_Spec*.md
-WRITEUP.md
-Anthropic_Candidacy_Playbook.md
-Staff_Level_Projects_Spec_July2026.md
-CLAUDE.md
-IMPLEMENTATION_BRIEF.md
-GoodputLab_Inference_Implementation_Brief.md
-AgentSLA_Implementation_Brief.md
-*.candidacy.md
-*candidacy_playbook*
-EXECUTION_PROMPT.md
-configs/runtime*.env
-
-# Python build artifacts
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -85,39 +24,70 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+.Python
 
-# Test coverage
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.uv/
+
+# Testing / coverage
+.pytest_cache/
 .coverage
 .coverage.*
 .cache
-nosetests.xml
+htmlcov/
 coverage.xml
+nosetests.xml
 *.cover
 *.py,cover
 .hypothesis/
-.pytest_cache/
 
-# mypy
+# Linters / type checkers
 .mypy_cache/
+.ruff_cache/
 .dmypy.json
 dmypy.json
 
-# IDE
+# DuckDB / Parquet runtime artifacts
+# (test fixtures and trace stores live outside the repo)
+*.duckdb
+*.duckdb.wal
+*.parquet
+.traces/
+
+# Editor / IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
 Thumbs.db
+*.log
 
-# Environment
+# Environment / secrets
 .env
-.venv
-ENV/
-env/
+.env.*
+
+# Internal planning / design docs (NEVER committed — workspace-level)
+.planning/
+suggestions/
+MASTER_EXECUTION_PROMPT_CLAUDE.md
+*_Prompt*.md
+*_Brief*.md
+*_Spec*.md
+EXECUTION_PROMPT.md
+Anthropic_Candidacy_Playbook.md
+Staff_Level_Projects_Spec_July2026.md
+IMPLEMENTATION_BRIEF.md
+GoodputLab_Inference_Implementation_Brief.md
+AgentSLA_Implementation_Brief.md
+*.candidacy.md
+*candidacy_playbook*
+configs/runtime*.env
 
 # Claude Code / MCP browser session artifacts
 .playwright-mcp/
