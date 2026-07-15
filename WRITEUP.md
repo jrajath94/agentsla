@@ -266,11 +266,13 @@ bench+report must produce a byte-identical table.
 
 ---
 
-## What shipped in v1.0 (this push)
+## What shipped in v0.2 / v0.2.2
 
-The v1 push closes the third-adapter gap and the real-LLM bench gap
-that v0.1 deferred. Below is the honest accounting — what's real,
-what's measured, and what remains.
+The v0.2 / v0.2.2 push closes the third-adapter gap and the real-LLM
+bench gap that v0.1 deferred. Below is the honest accounting — what's
+real, what's measured, and what remains. The exact release dates and
+release-line highlights are in `CHANGELOG.md § [v0.2.0]` and
+`CHANGELOG.md § [v0.2.2]`.
 
 ### Third adapter: ClaudeSdkAdapter
 
@@ -288,7 +290,7 @@ verifier / classifier would not be adapter-agnostic.
 in tests; the live `claude_agent_sdk` is not installed in CI (it's
 optional, opt-in). A reviewer can wire a real client and the
 adapter contract holds; we have not run a live Claude API through
-the SDK adapter at v1.
+the SDK adapter at v0.2.
 
 ### Real-LLM bench harness
 
@@ -300,7 +302,7 @@ stderr message; errors during the run become rows tagged
 rate-limits mid-run.
 
 **Honest gap**: The harness path, tests, and CLI are real; the live
-numbers require a key. No live rows are committed to v1 because no
+numbers require a key. No live rows are committed at v0.2 because no
 `ANTHROPIC_API_KEY` is available in the build environment. The
 schema (`mode, task_id, domain, model_id, seed, success, gate_passed,
 verified_at_truth, sensitivity, specificity, latency_ms, text, note`)
@@ -323,8 +325,8 @@ gap.
 
 ### Per-verifier tolerance + range claim per-endpoint multiplier
 
-`NumericVerifier(tolerance=...)` was already in v0.2; v1 pins the
-contract with regression tests in
+`NumericVerifier(tolerance=...)` was already available pre-v0.2;
+v0.2 pins the contract with regression tests in
 `tests/unit/verify/test_numeric_tolerance_config.py`. The range-
 claim regex (`agentsla/verify/claims.py:_RANGE_PATTERN`) now accepts
 K/M/B/% on both endpoints: `$4.2M-$4.5M` → `(4_200_000, 4_500_000)`.
@@ -348,32 +350,28 @@ breaks the test.
 
 ### Failure modes: 6 → 15
 
-`docs/failure-modes.md` adds 9 modes surfaced by the v1 push:
+`docs/failure-modes.md` adds 9 modes surfaced by the v0.2 push:
 adapter parity drift, range multiplier mismatch, real-LLM rate-
 limit, held-out fixture circularity, per-verifier tolerance drift,
 fixture degradation, CLI subcommand collision, generated artifacts,
 tool-call id collisions. Each is documented with trigger, why it
-breaks, observable signal, v1 status, and mitigation — the same
+breaks, observable signal, v0.2 status, and mitigation — the same
 format as the v0.1 6-mode list.
 
-### Test count: 295 → 432
+### Test count
 
-The v1 push added 137 tests across the integration, unit, property,
-and script test directories. The breakdown:
+The exact test count is whatever `pytest tests/ -q --co | tail -1`
+reports on the current commit. A pinned integer here would drift the
+moment a new test lands; the live command is the source of truth.
+The v0.2 / v0.2.2 push added tests across the integration, unit,
+property, and script test directories — exact delta is in
+`CHANGELOG.md § [v0.2.0] Atomic commits` and `CHANGELOG.md § [v0.2.2]`.
 
-* +13 (per-verifier tolerance + range claim + claims extension)
-* +15 (cross-adapter parity: 5 each × 3 adapters)
-* +5 (real-LLM bench harness: API-key, schema, CLI smoke, etc.)
-* +5 (held-out fixture: synthetic + real builders + CLI smoke)
-* +4 (README quickstart integration)
-* +95 across the other supporting test files (mypy fixes, regression
-  guards, refactor coverage)
-
-### Quality gates (v1.0)
+### Quality gates (v0.2 / v0.2.2)
 
 | Gate | Status |
 |------|--------|
-| `pytest -q` | 432 passed, ~12s |
+| `pytest -q` | live count from `pytest tests/ -q --co` |
 | `ruff check .` | clean |
 | `mypy --strict agentsla/core agentsla/policy agentsla/verify` | zero findings |
 | Coverage on core/policy/verify | ≥ 85% |
@@ -381,15 +379,15 @@ and script test directories. The breakdown:
 | Cross-adapter parity | byte-identical (modulo UUIDs) |
 | README truth-pin | integration test green |
 
-### v1.0 honest gaps (carried forward)
+### v0.2 / v0.2.2 honest gaps (carried forward)
 
-The v1 push explicitly does NOT solve:
+The v0.2 / v0.2.2 push explicitly does NOT solve:
 
 * **Live-LLM bench numbers** — the harness + tests + CLI are real;
   the actual numbers require a key (explicitly marked
   `[NOT YET MEASURED]`).
 * **Concurrent adapter paths** — current adapters are single-
-  threaded; tool-call id collision is documented but not yet a v1
+  threaded; tool-call id collision is documented but not yet a v0.2
   path.
 * **Per-verifier tolerance consensus** — chain does not enforce
   uniform tolerance; operators choose per domain.
@@ -397,7 +395,7 @@ The v1 push explicitly does NOT solve:
 * **Multi-tenancy / per-tenant policy** — governance decisions TBD.
 * **OpenTelemetry exporter** — separate design pass.
 
-Each of these is a small, bounded change for v1.1 or later. None
+Each of these is a small, bounded change for v0.3 or later. None
 require redesigning the surface.
 
 — AgentSLA contributors, 2026.
