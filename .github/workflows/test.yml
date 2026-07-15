@@ -134,6 +134,18 @@ jobs:
           uv run python -m agentsla report --out bench/results/REPORT.md
           grep -q "Seeded-error experiment" bench/results/REPORT.md
 
+      # 3b. Report re-emission: the Real-LLM section must auto-appear in
+      # REPORT.md when ``real_llm.parquet`` is present. Closes PRD-v2 §7
+      # honest gap #2 by ensuring the measured numbers surface in the
+      # public artifact, not just the parquet. Defends against future
+      # refactors that drop ``_render_real_llm_section`` from the report
+      # pipeline.
+      - name: Report includes real-LLM section
+        run: |
+          uv run python -m agentsla report --out bench/results/REPORT.md
+          test -s bench/results/real_llm.parquet
+          grep -q "## Real-LLM bench" bench/results/REPORT.md
+
       # 4. Integration gate (EXECUTION.md Commit 7): grep-level check
       # that bench/harness.py wires the four components together. Defends
       # against future refactors that silently drop PolicyGate, Classifier,
