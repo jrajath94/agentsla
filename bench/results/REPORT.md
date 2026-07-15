@@ -25,27 +25,27 @@ _Generated from `bench/results/results.parquet`._
 | Gate passed | 0% | 100% | +100% |
 | Verified at truth | n/a | n/a | — |
 | Injection resistance | 0% | 100% | +100% |
-| p95 latency (ms) | 6.81 | 10.17 | +3.36 (+49.3%) |
-| Mean latency (ms) | 5.86 | 8.50 | +2.64 |
+| p95 latency (ms) | 6.41 | 7.50 | +1.08 (+16.9%) |
+| Mean latency (ms) | 4.97 | 6.39 | +1.42 |
 | N runs | 70 | 70 | — |
 
 ## Per-domain breakdown
 
 | Domain | Mode | Success | Gate passed | Verified@truth | Inj resist | p95 (ms) |
 |--------|------|--------:|------------:|---------------:|-----------:|---------:|
-| financial_ops | naked | 100% | 0% | n/a | 0% | 6.37 |
-| financial_ops | wrapped | 67% | 100% | n/a | 100% | 10.17 |
-| incident_triage | naked | 100% | 0% | n/a | 100% | 6.81 |
-| incident_triage | wrapped | 100% | 100% | n/a | 100% | 11.11 |
-| doc_qa | naked | 100% | 0% | n/a | 100% | 6.61 |
-| doc_qa | wrapped | 100% | 100% | n/a | 100% | 8.76 |
+| financial_ops | naked | 100% | 0% | n/a | 0% | 6.41 |
+| financial_ops | wrapped | 67% | 100% | n/a | 100% | 7.29 |
+| incident_triage | naked | 100% | 0% | n/a | 100% | 5.54 |
+| incident_triage | wrapped | 100% | 100% | n/a | 100% | 7.42 |
+| doc_qa | naked | 100% | 0% | n/a | 100% | 5.54 |
+| doc_qa | wrapped | 100% | 100% | n/a | 100% | 7.57 |
 
 ## Holdout subset (excluded from dev tuning)
 
 | Mode | N | Success | Gate passed | Verified@truth | p95 (ms) |
 |------|--:|--------:|------------:|---------------:|---------:|
-| naked | 16 | 100% | 0% | n/a | 6.00 |
-| wrapped | 16 | 88% | 100% | n/a | 8.69 |
+| naked | 16 | 100% | 0% | n/a | 5.82 |
+| wrapped | 16 | 88% | 100% | n/a | 6.86 |
 
 ## Seeded-error experiment (verification gate validation)
 
@@ -53,8 +53,8 @@ _Generated from `bench/results/seeded_errors.parquet`. Synthetic numeric tasks w
 
 | Perturbation | N trials | Sensitivity (gate caught) | Specificity (clean pass) | Mean latency (ms) |
 |-------------:|---------:|--------------------------:|-------------------------:|------------------:|
-| ±10.0% | 1000 | 100% | 0% | 16.81 |
-| ±20.0% | 1000 | 100% | 0% | 5.84 |
+| ±0.0% | 100 | 100% | 100% | 3.48 |
+| ±50.0% | 100 | 100% | 0% | 3.45 |
 
 **Acceptance** (per `feedback.md` Item 3):
 - sensitivity @ ±50% perturbation ≥ 85%
@@ -130,3 +130,13 @@ Confusion matrix (rows=gold, cols=predicted):
 | tool_call_error | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 
 Held-out traces were generated independently from the heuristics' training triggers; this evaluation is therefore honest (not circular). Replace the fixture at `tests/fixtures/held_out_labels.jsonl` with human-labeled traces to upgrade the headline number.
+
+
+## Real-LLM bench
+
+_Generated from `bench/results/real_llm.parquet`. Model: `MiniMax-M3`. This is the only path that produces measured `verified_at_truth` numbers — the hermetic EchoModel bench cannot._
+
+| Mode | Success | Gate passed | Verified@truth | N rows | p95 (ms) |
+|------|--------:|------------:|---------------:|-------:|---------:|
+| naked | 92% | 0% | 92% | 12 | 2981 |
+| wrapped | 92% | 100% | 92% | 12 | 2981 |
