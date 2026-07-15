@@ -34,7 +34,14 @@ from agentsla.classify.metrics import build_metrics
 # samples (HELP/TYPE lines survive, ready for Prometheus to scrape).
 # build_metrics() is idempotent: a second call returns the cached
 # bundle rather than raising ``Duplicated timeseries``.
-_ENSURED = build_metrics(registry=REGISTRY)
+#
+# Pass no registry arg so the cache key matches
+# ``agentsla/bench/harness.py:_METRICS = build_metrics()`` — both
+# default to ``registry=None`` and share the same ``id(None)``
+# cache slot. Passing ``registry=REGISTRY`` would compute
+# ``id(REGISTRY)`` for the key (different int) and miss the cache,
+# then re-register on REGISTRY and raise Duplicated timeseries.
+_ENSURED = build_metrics()
 
 # ---------------------------------------------------------------------------
 # Registry resolution
