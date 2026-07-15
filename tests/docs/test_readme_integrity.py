@@ -69,7 +69,16 @@ def pyproject_version() -> str:
 
 @pytest.fixture(scope="module")
 def injection_variant_count() -> int:
-    """Distinct injection task ids in the hermetic parquet."""
+    """Distinct injection task ids in the hermetic parquet.
+
+    Skips when the parquet is absent (fresh CI clone without a prior
+    bench run); the parquet is gitignored. Skipping rather than
+    failing gates the test on bench reproducibility — without the
+    parquet the doc claim is unmeasurable. To exercise this in CI,
+    run ``agentsla bench --seeds 1`` first (the integration gate does).
+    """
+    if not HERMETIC_PARQUET.exists():
+        pytest.skip(f"{HERMETIC_PARQUET} not present (parquet is gitignored; run `agentsla bench --seeds 1` to populate).")
     table = pq.read_table(HERMETIC_PARQUET)
     task_ids = table.column("task_id").to_pylist()
     has_injection = table.column("has_injection").to_pylist()
@@ -78,7 +87,9 @@ def injection_variant_count() -> int:
 
 @pytest.fixture(scope="module")
 def task_count() -> int:
-    """Distinct task ids in the hermetic parquet."""
+    """Distinct task ids in the hermetic parquet. Skip-on-absent — see injection_variant_count."""
+    if not HERMETIC_PARQUET.exists():
+        pytest.skip(f"{HERMETIC_PARQUET} not present (parquet is gitignored; run `agentsla bench --seeds 1` to populate).")
     table = pq.read_table(HERMETIC_PARQUET)
     return len(set(table.column("task_id").to_pylist()))
 

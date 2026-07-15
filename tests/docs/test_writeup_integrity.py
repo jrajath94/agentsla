@@ -235,19 +235,29 @@ def test_writeup_failure_modes_count_matches_doc() -> None:
 
 @pytest.fixture(scope="module")
 def hermetic_seeds() -> list[int]:
-    """Seeds present in the hermetic bench parquet (source of truth for bench shape)."""
+    """Seeds present in the hermetic bench parquet (source of truth for bench shape).
+
+    Skips when parquet is absent (gitignored). See the matching skip
+    contract in :mod:`test_readme_integrity` for rationale.
+    """
+    parquet = ROOT / "bench" / "results" / "results.parquet"
+    if not parquet.exists():
+        pytest.skip(f"{parquet} not present (parquet is gitignored; run `agentsla bench --seeds 1` to populate).")
     import pyarrow.parquet as pq
 
-    table = pq.read_table(ROOT / "bench" / "results" / "results.parquet")
+    table = pq.read_table(parquet)
     return sorted(set(table.column("seed").to_pylist()))
 
 
 @pytest.fixture(scope="module")
 def hermetic_rows_per_mode() -> dict[str, int]:
-    """Row count per mode in the hermetic bench parquet."""
+    """Row count per mode in the hermetic bench parquet. Skip-on-absent — see hermetic_seeds."""
+    parquet = ROOT / "bench" / "results" / "results.parquet"
+    if not parquet.exists():
+        pytest.skip(f"{parquet} not present")
     import pyarrow.parquet as pq
 
-    table = pq.read_table(ROOT / "bench" / "results" / "results.parquet")
+    table = pq.read_table(parquet)
     out: dict[str, int] = {}
     for m in table.column("mode").to_pylist():
         out[m] = out.get(m, 0) + 1
