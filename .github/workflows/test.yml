@@ -168,3 +168,19 @@ jobs:
             fi
           done
           echo "bench wiring symbols OK"
+
+      # 5. Classifier eval provenance gate — defends the PRD-v2 §5
+      # invariant #4 ("Honest-gap banners are public") by ensuring the
+      # eval report surfaces whether the headline came from synthetic
+      # generators or from real Claude API responses. If a refactor
+      # silently drops the provenance banner from
+      # ``render_eval_section``, this grep fails and the PR cannot land.
+      - name: Integration gate — eval-classifier provenance banner
+        run: |
+          set -euo pipefail
+          uv run python -m agentsla.bench.eval_classifier \
+            --held-out tests/fixtures/held_out_labels.jsonl \
+            --out bench/results/eval_classifier.md
+          test -s bench/results/eval_classifier.md
+          grep -q "Fixture provenance" bench/results/eval_classifier.md
+          echo "eval-classifier provenance banner OK"
