@@ -26,6 +26,16 @@ from typing import Any
 
 from prometheus_client import REGISTRY, generate_latest, start_http_server
 
+from agentsla.classify.metrics import build_metrics
+
+# Register the three AgentSLA metric families on the process-global
+# REGISTRY at import time so ``agentsla metrics snapshot`` and
+# ``agentsla metrics serve`` always expose them — even with zero
+# samples (HELP/TYPE lines survive, ready for Prometheus to scrape).
+# build_metrics() is idempotent: a second call returns the cached
+# bundle rather than raising ``Duplicated timeseries``.
+_ENSURED = build_metrics(registry=REGISTRY)
+
 # ---------------------------------------------------------------------------
 # Registry resolution
 # ---------------------------------------------------------------------------
