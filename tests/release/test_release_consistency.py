@@ -24,6 +24,7 @@ are excluded from "latest released tag" computation. See
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -31,6 +32,43 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 PYPROJECT = REPO_ROOT / "pyproject.toml"
 CHANGELOG = REPO_ROOT / "CHANGELOG.md"
+
+
+def _branch_tip_ref() -> str:
+    """Resolve the branch-tip ref for the release-consistency commit-count check.
+
+    Why this exists
+    ---------------
+    For ``pull_request`` events, ``actions/checkout`` checks out the
+    synthetic merge commit (``refs/pull/<n>/merge``), NOT the branch tip.
+    A naive ``git rev-list v1.0.0..HEAD --count`` would always report 1
+    on every PR build because the merge commit itself is past the tag —
+    even when zero real commits landed.
+
+    For ``push`` events, HEAD is already the branch tip, so the same
+    naive form works.
+
+    This helper returns a ref that resolves to the actual branch tip in
+    both cases:
+
+      * ``pull_request`` → ``origin/<GITHUB_HEAD_REF>`` (the source branch)
+      * ``push``         → ``origin/<GITHUB_REF_NAME>`` (the pushed branch)
+      * local dev        → ``HEAD`` (works because the developer is on tip)
+
+    The CI jobs have ``fetch-depth: 0`` so all ``origin/*`` refs are
+    fetched. See ``.github/workflows/test.yml``.
+
+    Returns "HEAD" if neither env var resolves (local-only dev).
+    """
+    event = os.environ.get("GITHUB_EVENT_NAME", "")
+    if event == "pull_request":
+        head = os.environ.get("GITHUB_HEAD_REF", "")
+        if head:
+            return f"origin/{head}"
+    ref_name = os.environ.get("GITHUB_REF_NAME", "")
+    if ref_name and ref_name != "HEAD":
+        return f"origin/{ref_name}"
+    return "HEAD"
 
 
 def _read_pyproject_version() -> str:
@@ -132,8 +170,9 @@ def test_latest_git_tag_matches_changelog_latest() -> None:
 def test_no_commits_since_latest_release_tag() -> None:
     """Zero commits on the current branch past the latest release tag."""
     tag = _latest_git_tag()
+    tip = _branch_tip_ref()
     out = subprocess.run(  # noqa: S603  -- tag from our own _latest_git_tag(), not user input
-        ["git", "rev-list", f"{tag}..HEAD", "--count"],  # noqa: S607  -- literal "git"
+        ["git", "rev-list", f"{tag}..{tip}", "--count"],  # noqa: S607  -- literal "git"
         capture_output=True,
         text=True,
         cwd=REPO_ROOT,
@@ -141,7 +180,51 @@ def test_no_commits_since_latest_release_tag() -> None:
     )
     count = int(out.stdout.strip())
     assert count == 0, (
-        f"{count} commit(s) on this branch past {tag} without a release tag. "
+        f"{count} commit(s) on this branch past {tag} (tip ref={tip}) without a release tag. "
         "Either tag a new release (bump pyproject + add CHANGELOG entry) "
         "or revert the commits."
     )
+
+
+class TestBranchTipRef:
+    """Pin the :func:`_branch_tip_ref` contract.
+
+    CI run :gh-run:`29427756245` failed ``test_no_commits_since_latest_release_tag``
+    because PR builds check out a synthetic merge commit at HEAD, so
+    ``v1.0.0..HEAD`` always equals 1 regardless of how clean the branch
+    is. The helper routes the comparison to ``origin/<branch>`` in CI,
+    which keeps both push and PR events honest.
+    """
+
+    def test_pull_request_event_uses_origin_head_ref(self, monkeypatch: object) -> None:
+        monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")  # type: ignore[attr-defined]
+        monkeypatch.setenv("GITHUB_HEAD_REF", "phase-3/writeup-integrity")  # type: ignore[attr-defined]
+        monkeypatch.delenv("GITHUB_REF_NAME", raising=False)  # type: ignore[attr-defined]
+        assert _branch_tip_ref() == "origin/phase-3/writeup-integrity"
+
+    def test_push_event_uses_origin_ref_name(self, monkeypatch: object) -> None:
+        monkeypatch.setenv("GITHUB_EVENT_NAME", "push")  # type: ignore[attr-defined]
+        monkeypatch.setenv("GITHUB_REF_NAME", "main")  # type: ignore[attr-defined]
+        monkeypatch.delenv("GITHUB_HEAD_REF", raising=False)  # type: ignore[attr-defined]
+        assert _branch_tip_ref() == "origin/main"
+
+    def test_push_to_phase_branch(self, monkeypatch: object) -> None:
+        monkeypatch.setenv("GITHUB_EVENT_NAME", "push")  # type: ignore[attr-defined]
+        monkeypatch.setenv("GITHUB_REF_NAME", "phase-3/writeup-integrity")  # type: ignore[attr-defined]
+        monkeypatch.delenv("GITHUB_HEAD_REF", raising=False)  # type: ignore[attr-defined]
+        assert _branch_tip_ref() == "origin/phase-3/writeup-integrity"
+
+    def test_local_dev_falls_back_to_head(self, monkeypatch: object) -> None:
+        monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)  # type: ignore[attr-defined]
+        monkeypatch.delenv("GITHUB_HEAD_REF", raising=False)  # type: ignore[attr-defined]
+        monkeypatch.delenv("GITHUB_REF_NAME", raising=False)  # type: ignore[attr-defined]
+        assert _branch_tip_ref() == "HEAD"
+
+    def test_pr_beats_ref_name_when_both_set(self, monkeypatch: object) -> None:
+        """If both env vars are present (shouldn't happen, but defended),
+        the PR head_ref wins because the merge commit is the wrong tip.
+        """
+        monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")  # type: ignore[attr-defined]
+        monkeypatch.setenv("GITHUB_HEAD_REF", "feature-branch")  # type: ignore[attr-defined]
+        monkeypatch.setenv("GITHUB_REF_NAME", "refs/pull/6/merge")  # type: ignore[attr-defined]
+        assert _branch_tip_ref() == "origin/feature-branch"
