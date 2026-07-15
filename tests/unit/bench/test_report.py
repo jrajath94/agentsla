@@ -329,3 +329,97 @@ class TestReportAutoIncludesRealLlmSection:
         assert "## Real-LLM bench" not in text
         # Honest-gap banner still appears (no real-LLM data → still a gap).
         assert "Honest gap" in text
+
+    def test_top_banner_suppressed_when_real_llm_has_measured_truth(self, tmp_path: Path) -> None:
+        """Pins the contract documented in README.md:
+        ``the honest-gap banner at the top of REPORT.md is suppressed
+        once measured rows land in real_llm.parquet``.
+
+        The hermetic EchoModel bench never measures ``verified_at_truth``
+        (the column is structurally None); but the Real-LLM bench path
+        CAN measure it. When the latter has measured rows, the top-of-
+        file "verified_at_truth not measured" banner must NOT appear —
+        claiming a gap that the next section on the same page closes is
+        a drift the README explicitly calls out as forbidden.
+
+        This test guards against two failure modes:
+
+          * Code reverts banner condition to "always show when hermetic
+            has no truth" (a regression that would re-introduce the
+            contradiction this test was written to remove).
+          * Code stops reading real_llm.parquet entirely (a refactor
+            that would orphan the auto-include section, leaving the
+            banner claiming a gap that the report can't fill).
+        """
+        results = tmp_path / "results.parquet"
+        real_llm = tmp_path / "real_llm.parquet"
+        # Hermetic results: zero ground truth → historically the banner
+        # condition would trip here.
+        _write_parquet(results, [_row(), _row(mode="wrapped", verified=True)])
+        # Real-LLM: BOTH modes have measured verified_at_truth.
+        _write_parquet(
+            real_llm,
+            [
+                _real_llm_row(mode="naked", verified_at_truth=True, gate_passed=False),
+                _real_llm_row(mode="wrapped", verified_at_truth=True, gate_passed=True),
+            ],
+        )
+        out = tmp_path / "report.md"
+        rc = report_main(["--in", str(results), "--out", str(out)])
+        assert rc == 0
+        text = out.read_text(encoding="utf-8")
+        # Real-LLM section still auto-appended.
+        assert "## Real-LLM bench" in text
+        # Top-of-file "verified_at_truth not measured" banner must NOT
+        # appear — the gap is closed by the section immediately below.
+        # NOTE: A scoped "every row is [NOT YET MEASURED]" marker is fine
+        # to appear in the Real-LLM section when those rows ARE
+        # unmeasured; this test's measured rows must prevent that too.
+        assert "not measured" not in text.lower(), (
+            "banner claiming a gap contradicts the measured Real-LLM section on the same page — README explicitly forbids this"
+        )
+
+    def test_top_banner_appears_when_real_llm_parquet_absent_but_hermetic_lacks_truth(self, tmp_path: Path) -> None:
+        """Symmetry check: when real_llm.parquet is absent, the top
+        banner IS the only honest signal — it must still appear.
+
+        Pairs with :func:`test_top_banner_suppressed_when_real_llm_has_measured_truth`
+        to lock in both sides of the suppression condition.
+        """
+        results = tmp_path / "results.parquet"
+        _write_parquet(results, [_row(), _row(mode="wrapped", verified=True)])
+        # No real_llm.parquet on disk.
+        out = tmp_path / "report.md"
+        rc = report_main(["--in", str(results), "--out", str(out)])
+        assert rc == 0
+        text = out.read_text(encoding="utf-8")
+        assert "Honest gap" in text
+        assert "verified_at_truth" in text
+
+    def test_top_banner_appears_when_real_llm_all_unmeasured(self, tmp_path: Path) -> None:
+        """When real_llm.parquet exists but every row's note is
+        ``[NOT YET MEASURED]``, the gap is NOT closed — the top banner
+        must still surface. This pins the second half of the suppression
+        condition: presence of the file alone is insufficient; measured
+        rows are required.
+        """
+        results = tmp_path / "results.parquet"
+        real_llm = tmp_path / "real_llm.parquet"
+        _write_parquet(results, [_row(), _row(mode="wrapped", verified=True)])
+        _write_parquet(
+            real_llm,
+            [
+                _real_llm_row(mode="naked", note="[NOT YET MEASURED] rate limit"),
+                _real_llm_row(mode="wrapped", note="[NOT YET MEASURED] rate limit"),
+            ],
+        )
+        out = tmp_path / "report.md"
+        rc = report_main(["--in", str(results), "--out", str(out)])
+        assert rc == 0
+        text = out.read_text(encoding="utf-8")
+        assert "Honest gap" in text
+        # Real-LLM section is present (file exists) but renders the
+        # scoped "every row is [NOT YET MEASURED]" marker instead of a
+        # numeric table.
+        assert "## Real-LLM bench" in text
+        assert "NOT YET MEASURED" in text

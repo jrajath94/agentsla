@@ -89,6 +89,35 @@ def _markdown_table(naked: dict, wrapped: dict) -> str:
     return "\n".join(lines)
 
 
+def _real_llm_has_measured_truth(real_llm_path: Path) -> bool:
+    """True if ``real_llm.parquet`` exists with at least one measured ``verified_at_truth``.
+
+    Used to gate the top-of-file ``verified_at_truth not measured``
+    banner. The banner claims a gap; the gap is closed only when the
+    Real-LLM bench path has actually emitted rows where
+    ``verified_at_truth`` is not ``None`` AND the row's ``note`` does
+    not start with ``[NOT YET MEASURED]``.
+
+    Presence of the file alone is insufficient: the path can exist
+    with all rows tagged ``[NOT YET MEASURED]`` (e.g. the model was
+    unreachable on the day of the run). In that state the honest move
+    is to keep the banner.
+
+    Pins the README contract: ``The honest-gap banner at the top of
+    REPORT.md is suppressed once measured rows land in real_llm.parquet``.
+    """
+    if not real_llm_path.exists():
+        return False
+    table = pq.read_table(real_llm_path)
+    for r in table.to_pylist():
+        note = str(r.get("note") or "")
+        if note.startswith("[NOT YET MEASURED]"):
+            continue
+        if r.get("verified_at_truth") is not None:
+            return True
+    return False
+
+
 def _render_real_llm_section(real_llm_path: Path) -> str:
     """Render the Real-LLM bench section from ``real_llm.parquet``.
 
@@ -252,7 +281,16 @@ def main(argv: list[str] | None = None) -> int:
     # for every aggregate. Surface this so a reviewer who opens the headline
     # table sees the gap AND the fix, not just "n/a". PRD-v1 § 2.1 F3:
     # "v1 must answer yes, with measured numbers — or surface the honest gap."
-    if naked["verified_at_truth"] is None and wrapped["verified_at_truth"] is None:
+    #
+    # Suppression condition: the Real-LLM bench path can independently
+    # populate ``verified_at_truth`` against ground-truth-declaring tasks.
+    # When ``real_llm.parquet`` exists with at least one measured row, the
+    # gap is closed by the auto-included Real-LLM section below — the
+    # top banner would falsely claim a gap on the same page that the
+    # next section closes. This is the README's pinned contract.
+    real_llm_path = args.in_path.parent / "real_llm.parquet"
+    gap_still_open = naked["verified_at_truth"] is None and wrapped["verified_at_truth"] is None
+    if gap_still_open and not _real_llm_has_measured_truth(real_llm_path):
         md += (
             "> **Honest gap — `verified_at_truth` not measured.**\n"
             "> The hermetic `EchoModel` self-certifies but does not declare\n"
@@ -328,7 +366,7 @@ def main(argv: list[str] | None = None) -> int:
     # adjacent. Source of truth = ``bench/real_llm.py``. This is the only path
     # that produces a measured ``verified_at_truth`` number; the hermetic
     # bench can never populate it. Closes PRD-v2 §7 honest gap #2.
-    real_llm_path = args.in_path.parent / "real_llm.parquet"
+    # ``real_llm_path`` already bound above (gap-suppression check).
     if real_llm_path.exists():
         md += "\n\n" + _render_real_llm_section(real_llm_path).rstrip("\n")
 
