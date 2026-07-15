@@ -173,10 +173,7 @@ _IS_PR_BUILD = os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
 
 skip_on_pr = pytest.mark.skipif(
     _IS_PR_BUILD,
-    reason=(
-        "release-consistency invariant only holds on push-to-main; "
-        "on PR builds the branch is ahead of the tag by construction"
-    ),
+    reason=("release-consistency invariant only holds on push-to-main; on PR builds the branch is ahead of the tag by construction"),
 )
 
 
