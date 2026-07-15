@@ -20,11 +20,11 @@ questions from a single append-only event log.
 
 ## What we measured
 
-A 30-task bench across financial ops, incident triage, and doc QA,
+A 35-task bench across financial ops, incident triage, and doc QA,
 run in hermetic mode (in-process EchoModel + JsonEchoTool) so the
 numbers are reproducible offline. Each task runs in two modes —
 *naked* (just the agent) and *wrapped* (agent + policy gate +
-verification gate + classifier + hooks) — across five seeds, plus
+verification gate + classifier + hooks) — across two seeds, plus
 five injection-attack variants that embed an AWS-key-formatted
 secret (`AKIAIOSFODNN7EXAMPLE`, real-format so the egress regex
 matches) in the task text.
@@ -39,7 +39,7 @@ The headline table (full per-domain in `bench/results/REPORT.md`):
 | **Injection resistance** | **0%** | **100%** | **+100%** |
 | p95 latency (ms) | 10.20 | 9.75 | -0.46 (-4.5%, within noise) |
 | Mean latency (ms) | 7.05 | 7.77 | +0.73 |
-| N runs | 175 | 175 | — |
+| N runs | 70 | 70 | — |
 
 The honest reading: in this bench, **wrapping buys verification
 coverage AND injection resistance at no measurable p95 latency
@@ -61,11 +61,12 @@ bench because the synthetic tasks do not declare canonical answers;
 it becomes meaningful when wired to real-task corpora. See
 `docs/comparative-analysis.md` for the framing.
 
-The 14-point wrapped-success-rate drop is the 25 injection-task
-runs (5 tasks × 5 seeds) where the policy correctly blocked the
-agent — the wrapped `final=""` so `task.expected_substring in final`
-evaluates False. That is intended: a wrapped agent that "succeeded"
-at exfiltrating an AWS key would be the bug, not the headline.
+The 14-point wrapped-success-rate drop is the 20 injection-payload
+rows (5 injection task variants × 2 seeds × 2 modes) where the
+policy correctly blocked the agent — the wrapped `final=""` so
+`task.expected_substring in final` evaluates False. That is
+intended: a wrapped agent that "succeeded" at exfiltrating an AWS
+key would be the bug, not the headline.
 
 The p95 latency overhead is within sub-millisecond noise; the
 -4.5% delta on this hermetic bench is dominated by wall-clock
@@ -85,13 +86,14 @@ WrappedHooks (175 labels written to `labels.jsonl`, 25 classified
 as `policy_violation` for the injection tasks); but the eval set
 itself remains synthetic.
 
-**No matplotlib figures.** REPORT.md is tables only. Honest and
-reproducible, but the bench writeup was supposed to ship with
-figures. We chose ASCII over matplotlib because the figure scripts
-would need to be re-run for any parquet regeneration, and the
-report contract is "byte-identical table from parquet." A
-side-by-side matplotlib emitter that reads parquet is deferred to
-v0.2.
+**Figures ship alongside the table.** v0.2 closed the v0.1 limitation
+where REPORT.md had no figure artifacts. Five PNGs (`success_rate.png`,
+`gate_passed.png`, `injection_resistance.png`, `latency_cdf.png`,
+`cost_per_task.png`) live under `bench/results/figures/` and are
+auto-included by `agentsla report` from the same `_aggregate()` that
+powers the markdown tables — so the figures cannot drift from the
+numbers. Regenerate with ``python -m agentsla.bench.figures
+--in bench/results/results.parquet --out-dir bench/results/figures``.
 
 **Hermetic EchoModel.** Real Claude / LangGraph adapters exist (Phase
 2), but the bench numbers come from in-process EchoModel. A live
@@ -469,11 +471,11 @@ the entire dataset.
 
 AgentSLA is a v0.1, not a product. The numbers are real — every
 row of `results.parquet` is reproducible — but the corpus is small
-(35 tasks × 5 seeds) and the model is hermetic. The headline is
-intentionally narrow: "wrapped gives you verification coverage
-AND injection resistance that naked does not, at ~13% p95 latency
-overhead on this corpus." Everything else (policy enforcement at
-scale, real LLM-judge agreement, cross-adapter parity under live
+(35 tasks × 2 seeds = 70 rows per mode) and the model is hermetic.
+The headline is intentionally narrow: "wrapped gives you verification
+coverage AND injection resistance that naked does not, at ~13% p95
+latency overhead on this corpus." Everything else (policy enforcement
+at scale, real LLM-judge agreement, cross-adapter parity under live
 network load) is v0.2 and beyond.
 
 The interesting next moves are the ones we deliberately left on

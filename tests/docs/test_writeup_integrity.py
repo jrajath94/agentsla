@@ -226,3 +226,173 @@ def test_writeup_failure_modes_count_matches_doc() -> None:
         assert n_modes == 15, (
             f"WRITEUP claims '6 → 15' failure modes but docs/failure-modes.md has {n_modes} numbered sections. Update the doc or the writeup."
         )
+
+
+# ---------------------------------------------------------------------------
+# Stale bench config claims (parquet is source of truth)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def hermetic_seeds() -> list[int]:
+    """Seeds present in the hermetic bench parquet (source of truth for bench shape)."""
+    import pyarrow.parquet as pq
+
+    table = pq.read_table(ROOT / "bench" / "results" / "results.parquet")
+    return sorted(set(table.column("seed").to_pylist()))
+
+
+@pytest.fixture(scope="module")
+def hermetic_rows_per_mode() -> dict[str, int]:
+    """Row count per mode in the hermetic bench parquet."""
+    import pyarrow.parquet as pq
+
+    table = pq.read_table(ROOT / "bench" / "results" / "results.parquet")
+    out: dict[str, int] = {}
+    for m in table.column("mode").to_pylist():
+        out[m] = out.get(m, 0) + 1
+    return out
+
+
+class TestWriteupBenchConfigClaims:
+    """WRITEUP § "What we measured" must reflect the current bench config.
+
+    Pin contracts — the bench parquet is the source of truth; WRITEUP
+    prose that names seed counts or row totals must agree:
+
+      * ``seeds`` = ``sorted(set(parquet.seed))`` = [0, 1]
+      * ``rows_per_mode`` = ``Counter(parquet.mode)`` = naked=70, wrapped=70
+
+    Previous prose described a 5-seed, 175-per-mode run from an
+    earlier era; that bench shape is no longer the one the repo ships.
+    The honest move is to reframe prose to match the parquet or to
+    cite the parquet as the source.
+    """
+
+    @pytest.mark.parametrize(
+        "stale_seed_phrase",
+        [
+            "five seeds",  # actual: 2 seeds
+            "Five seeds",
+            "5 seeds",  # numeric form too
+        ],
+    )
+    def test_writeup_no_stale_seed_count_phrase(self, writeup_text: str, stale_seed_phrase: str) -> None:
+        """WRITEUP must not reference a seed count that contradicts the parquet.
+
+        The hermetic parquet carries exactly two seeds (0 and 1). Any
+        prose that names "five seeds" (or any other integer than 2)
+        becomes a stale claim the moment the bench runs with a
+        different seed count. The honest move is to point at
+        ``bench/results/results.parquet`` for the live shape, or name
+        the seeds literally as "seeds 0 and 1" instead of an integer.
+        """
+        assert stale_seed_phrase not in writeup_text, (
+            f"WRITEUP.md references '{stale_seed_phrase}' but hermetic parquet "
+            "carries 2 seeds [0, 1]. Update WRITEUP prose to match the parquet "
+            "(or cite the parquet directly as the source)."
+        )
+
+    @pytest.mark.parametrize(
+        "stale_n_phrase",
+        [
+            "N=175",  # actual: N=70 per mode (2 seeds * 35 tasks)
+            "175 / 175",  # the symmetric form
+            "N runs\n=175",
+        ],
+    )
+    def test_writeup_no_stale_row_count_phrase(self, writeup_text: str, stale_n_phrase: str) -> None:
+        """WRITEUP must not embed a row count that contradicts the parquet.
+
+        The hermetic parquet carries 70 rows per mode (35 tasks x 2
+        seeds). The prose cited ``N=175 / 175`` (350 total) from a
+        5-seed run no longer in scope.
+        """
+        assert stale_n_phrase not in writeup_text, (
+            f"WRITEUP.md embeds row count '{stale_n_phrase}' but parquet has "
+            "70 rows per mode (35 tasks x 2 seeds). Update prose or cite "
+            "results.parquet directly."
+        )
+
+    @pytest.mark.parametrize(
+        "stale_figures_phrase",
+        [
+            "No matplotlib figures",  # figures shipped in v0.2.0
+            "deferred to v0.2",  # figures shipped in v0.2.0
+            "side-by-side matplotlib emitter that reads parquet is deferred",  # was a v0.2 deferral; no longer deferred
+        ],
+    )
+    def test_writeup_no_stale_figures_deferral_claim(self, writeup_text: str, stale_figures_phrase: str) -> None:
+        """WRITEUP § "Where we fell short" must not claim matplotlib figures
+        were deferred to v0.2 — figures shipped in v0.2.0 and remain in
+        ``bench/results/figures/`` (auto-included from REPORT.md).
+
+        This was a real v0.1-era limitation that v0.2.0 fixed (see
+        CHANGELOG). Leaving the stale "fell short" framing in the
+        writeup mis-states current reality.
+        """
+        assert stale_figures_phrase not in writeup_text, (
+            f"WRITEUP.md claims '{stale_figures_phrase}' but figures shipped "
+            "in v0.2.0 (5 PNGs in bench/results/figures/, auto-included in "
+            "REPORT.md). Reframe 'fell short' to reflect that this was "
+            "fixed in v0.2.0, or delete the section."
+        )
+
+    def test_seeds_phrase_consistent_with_parquet(self, writeup_text: str, hermetic_seeds: list[int]) -> None:
+        """If WRITEUP names a seed count integer ("N seeds"), it must match the parquet.
+
+        Catches both the historic 5-seed claim AND any future drift.
+        """
+        for claim in re.findall(r"\b(\d+)\s+seeds?\b", writeup_text):
+            # Only flag claims that are part of bench-config prose.
+            assert int(claim) == len(hermetic_seeds), (
+                f"WRITEUP.md says '{claim} seeds' but hermetic parquet has "
+                f"{len(hermetic_seeds)} seeds ({hermetic_seeds}). Update prose "
+                "or drop the integer in favor of `bench/results/results.parquet`."
+            )
+
+
+# ---------------------------------------------------------------------------
+# Cross-doc claim: figures actually exist on disk
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def figures_dir() -> Path:
+    return ROOT / "bench" / "results" / "figures"
+
+
+class TestFiguresShipped:
+    """WRITEUP must not claim figures are absent when they ship on disk.
+
+    The figures directory is gitignored — locally it is populated by
+    ``python -m agentsla.bench.figures --in ... --out-dir ...``. The
+    test treats the directory as authoritative: if any PNGs exist, the
+    writeup's "no figures" framing is broken.
+    """
+
+    @pytest.mark.skipif(
+        not (ROOT / "bench" / "results" / "figures").exists(),
+        reason="bench/results/figures/ not yet rendered (run `agentsla.bench.figures`)",
+    )
+    def test_no_figures_claim_when_pngs_exist(self, writeup_text: str, figures_dir: Path) -> None:
+        """Pin: if any ``*.png`` lives in figures/, no prose claiming
+        figures are absent or deferred may survive in WRITEUP.
+        """
+        pngs = sorted(figures_dir.glob("*.png"))
+        if not pngs:
+            pytest.skip("no PNGs in figures/ — deferral claim is still honest")
+        # WRITEUP must not say figures don't exist or are deferred.
+        forbidden = [
+            "No matplotlib figures",
+            "no figures",
+            "tables only",
+            "deferred to v0.2",
+        ]
+        for phrase in forbidden:
+            if phrase in writeup_text:
+                pytest.fail(
+                    f"WRITEUP.md contains '{phrase}' but bench/results/figures/ "
+                    f"has {len(pngs)} PNGs: {[p.name for p in pngs]}. Reframe "
+                    "the section as a shipped item rather than a deferred one."
+                )
