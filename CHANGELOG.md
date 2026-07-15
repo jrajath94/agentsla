@@ -2,7 +2,7 @@
 
 All notable changes to AgentSLA are recorded here. Dates are UTC.
 
-## Unreleased — Patch: standalone Prometheus exporter (`agentsla metrics serve`)
+## [v1.0.1] — 2026-07-15 — Patch: standalone Prometheus exporter (`agentsla metrics serve`)
 
 The v1.0.0 Tier-1 release shipped the metric families
 (`agentsla_failures_total`, `agentsla_verify_coverage`,
