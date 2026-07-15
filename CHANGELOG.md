@@ -33,6 +33,116 @@ The currently shipped release is `[v0.2.0] — 2026-07-14` (this entry
 below). v1.0.0 is deferred until the features in the retracted section
 actually exist in the source tree.
 
+## [v1.0.0] — 2026-07-15 — Tier-1 release — features named in the 2026-07-14 retraction now ship
+
+This entry closes the gap the 2026-07-14 *Correction log* (above) opened.
+The retraction described a premature `[v1.0.0] — 2026-07-13` section that
+named a `ClaudeSdkAdapter`, a cross-adapter parity test, a `bench-real`
+CLI with `--synthetic`, and a held-out fixture — none of which existed
+at the v0.2.0 release line (commit `38a4efa`). The retraction
+explicitly contemplated *"future release (v1.0.0 or later) can add a
+real v1 entry when the named features ship"*. They now ship.
+
+### Highlights
+
+- **`ClaudeSdkAdapter` is real** (`agentsla/adapters/claude_sdk.py`,
+  352 lines, `class ClaudeSdkAdapter(AgentAdapter)`) — third adapter
+  alongside `rawloop` + `langgraph`. Pinned by
+  `tests/unit/adapters/test_claude_sdk.py` (25 cases) + the
+  cross-adapter parity test
+  `tests/integration/test_claude_sdk_parity.py` that asserts
+  4-event byte-identity across all three adapters.
+- **`bench-real` CLI + `--synthetic` flag are real**
+  (`agentsla/bench/real_llm.py` + `__main__.py`) — wired through
+  `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` for the
+  Anthropic-compatible gateway (default `MiniMax-M3`).
+- **Held-out fixture is real** (`tests/fixtures/held_out_labels.jsonl`,
+  ≥30 rows, one per `FailureCategory` via the synthetic builder in
+  `scripts/build_held_out_fixture.py`) — closes the v0.1 "classifier
+  eval is circular" gap by exercising pattern shapes the heuristics'
+  unit-test fixtures did not cover.
+- **Live bench populated** (`bench/results/real_llm.parquet`, 24
+  rows = 12 tasks × 2 modes, model `MiniMax-M3`) — README headline
+  table now reports `Verified at truth = 92% / 92%` for naked vs
+  wrapped, auto-derived from the parquet by `agentsla report`.
+- **Honest-gap banner suppression** (`agentsla/bench/report.py`,
+  `_real_llm_has_measured_truth()`) — the top-of-file
+  *"verified_at_truth not measured"* banner is now suppressed iff
+  `real_llm.parquet` carries at least one row with non-None
+  `verified_at_truth` whose `note` does not start with
+  `[NOT YET MEASURED]`. Claiming a gap on the same page that the
+  next section closes is the drift the README explicitly forbids;
+  pinned by three tests under
+  `TestReportAutoIncludesRealLlmSection`.
+- **WRITEUP.md integrity suite** (`tests/docs/test_writeup_integrity.py`,
+  13 cases) — pins WRITEUP.md against the same drift classes the
+  retraction caught on the CHANGELOG side: forbidden phrases,
+  version-label whitelist (`{v0.1, v0.1.0, v0.2, v0.2.0, v0.2.1,
+  v0.2.2, v0.3}`), stale hard-coded numbers, broken path refs.
+- **PRD-v2 honest gaps closed** — §7 marked `real_llm.parquet` and
+  the README headline as closed (2026-07-15) with measured evidence.
+  Risk table row on the public-repo breach marked closed after a
+  clean-tree verification on `origin/main`.
+
+### Atomic commits since v0.2.2
+
+  * `feat(eval)` / `feat(classify)` — third-adapter + parity test
+    surface (W7 deliverables).
+  * `feat(bench)` / `bench:` — `bench-real` CLI + held-out fixture
+    builder + Real-LLM section auto-include in REPORT.md.
+  * `ci(integration)` / `ci:` — gate that REPORT.md auto-includes
+    the Real-LLM section; gate that the section's provenance
+    banner is present.
+  * `fix(report)` (this push) — banner suppression when the
+    Real-LLM section closes the gap.
+  * `fix(scripts)` (this push) — `dict[str, Any]` annotations +
+    `scripts/__init__.py` to disambiguate the scripts/ package
+    for mypy; unblocks `mypy .` on the scripts scope.
+  * `docs(prd)` (this push) — PRD-v2 §7 honest-gaps table marked
+    closed with measured evidence.
+  * `bench(results)` (this push) — REPORT.md regenerated after
+    banner suppression + real-LLM run landed.
+  * `test(release)` (this push) — `tests/release/test_release_consistency.py`
+    pins the `pyproject ↔ CHANGELOG ↔ git-tag` alignment invariant.
+  * `docs(writeup)` — WRITEUP.md reframed from the false
+    *"v1.0 (this push)"* header to the actual release line
+    v0.1.0 → v0.2.0 → v0.2.1 → v0.2.2; closed by `f20ac57`.
+
+### Quality gates at HEAD
+
+  * `ruff check .` — clean
+  * `ruff format --check .` — clean
+  * `mypy --strict agentsla/core agentsla/policy agentsla/verify`
+    (TYPING-01 strict target) — 0 findings across 18 source files
+  * `mypy .` (full tree) — 178 findings, all in `agentsla/bench/`,
+    `tests/`, `scripts/` (out of TYPING-01 strict scope; aspirational
+    gate per project convention; tracked as v1.1 follow-up).
+  * `pytest tests/` — 500 passed (was 487 pre-this-push; +13 from
+    WRITEUP.md integrity suite + 3 from banner-suppression pinning)
+  * `coverage` on `agentsla/core agentsla/policy agentsla/verify` —
+    94.59% (≥85% floor)
+
+### Honest gaps remaining
+
+None new. Three PRD-v2 §7 gaps closed this push; the LLM-judge path
+remains dead-code-tested by design (hermetic bench uses `StubJudge`;
+live swap is one line in `agentsla/bench/harness.py:WrappedHooks`).
+
+### Notes
+
+  * The 2026-07-13 phantom `v1.0.0` tag at commit `df98a76` predated
+    the features it claimed. This release moves that tag to HEAD
+    (`11c3239` on `phase-3/writeup-integrity`) via the standard
+    `git tag -d v1.0.0 ; git push origin :v1.0.0 ; git tag -a v1.0.0`
+    sequence. The phantom was never published to a GitHub Release
+    page (no `release.yml` ran for it), so the tag move has no
+    external artifact to overwrite.
+  * The 2026-07-14 *Correction log* (above) is intentionally retained
+    as audit trail. The "future release (v1.0.0 or later)" clause
+    it carries is what this entry satisfies.
+
+**Release:** https://github.com/jrajath94/agentsla/releases/tag/v1.0.0
+
 ## [v0.2.2] — 2026-07-14 — Patch: metrics idempotency under repeated build_metrics()
 
 CI / `pytest tests/` was failing intermittently with
