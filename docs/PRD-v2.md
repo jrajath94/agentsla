@@ -148,11 +148,17 @@ These are the **non-negotiable** integrity rules. Violating any closes Tier-1.
 
 ## 7. Open honest gaps (PRD-v2 delta from PRD-v1)
 
-| Gap | Why still open | Closure path |
+Status updated **2026-07-15** after live run landed `real_llm.parquet`.
+
+| Gap | Status (2026-07-15) | Evidence / closure |
 |---|---|---|
-| `real_llm.parquet` not yet populated against MiniMax-M3 | API key authorization + remote run pending | Run `python -m agentsla bench-real --model MiniMax-M3 --tasks-per-domain 5` with env set inline |
-| README "verifier caught X%" headline | depends on real_llm numbers | auto-derived once real_llm.parquet lands |
-| Classifier judge (LLM) never exercised in live bench | hermetic bench uses StubJudge by design | documented limitation; live swap is 1 line in harness |
+| `real_llm.parquet` not yet populated against MiniMax-M3 | **Closed** | `bench/results/real_llm.parquet` carries 24 rows (12 tasks × 3 domains × 1 seed) measured on MiniMax-M3. REPORT § Real-LLM bench surfaces naked-vs-wrapped `Verified@truth`. Re-run: `python -m agentsla bench-real --model MiniMax-M3 --tasks-per-domain 5`. |
+| README "verifier caught X%" headline | **Closed** | README § Results table now reports `Verified at truth = 92% / 92%` for real-LLM path. Auto-regenerates from parquet via `agentsla report`. |
+| Classifier judge (LLM) never exercised in live bench | **Documented limitation (intentional)** | Hermetic bench uses `StubJudge` by design — see `agentsla/classify/judge.py:StubJudge` docstring and `WRITEUP.md § Limits`. Two-stage classifier's LLM-judge branch is dead-code-tested but never hot in CI; live swap is one line in `agentsla/bench/harness.py:WrappedHooks`. |
+
+### Honest-gap callout suppression (banner logic)
+
+The top-of-file `> **Honest gap — verified_at_truth not measured.**` banner in `REPORT.md` is suppressed iff `real_llm.parquet` carries at least one row with non-null `verified_at_truth` and `note` not prefixed `[NOT YET MEASURED]`. Pinning tests: `tests/unit/bench/test_report.py::TestReportAutoIncludesRealLlmSection::{test_top_banner_suppressed_when_real_llm_has_measured_truth,test_top_banner_appears_when_real_llm_parquet_absent_but_hermetic_lacks_truth,test_top_banner_appears_when_real_llm_all_unmeasured}`.
 
 ---
 
@@ -161,6 +167,6 @@ These are the **non-negotiable** integrity rules. Violating any closes Tier-1.
 | Risk | Likelihood | Mitigation |
 |---|---|---|
 | Anthropic API key drift / rate limit during live bench | Medium | real_llm path tolerates errors, writes `[NOT YET MEASURED]` rows |
-| Public-repo breach: strategy docs (Anthropic_Candidacy_Playbook, MASTER_EXECUTION_PROMPT_CLAUDE, Staff_Level_Projects_Spec_July2026, briefs) leaked on `origin/main` | Confirmed (per PORTFOLIO.md §4) | **Destructive remediation required — human approval before any filter-repo or force-push** |
+| Public-repo breach: strategy docs (Anthropic_Candidacy_Playbook, MASTER_EXECUTION_PROMPT_CLAUDE, Staff_Level_Projects_Spec_July2026, briefs) leaked on `origin/main` | **Closed (2026-07-15)** | Verified clean: `git ls-tree -r origin/main --name-only \| grep -iE "(playbook\|master_execution\|brief\|staff_level\|candidacy)"` returns no matches. Original v0.1 close scrubbed history across 4 commits (commit `6e6e7ce`); this risk is stale, documented here as a defensive cross-check. |
 | Prometheus metrics endpoint exposes on LAN by default | Mitigated (defaults to 127.0.0.1) | keep `--metrics-addr 127.0.0.1` default |
 | Coverage drop when new code lands | Low | CI gate enforces ≥85% |
