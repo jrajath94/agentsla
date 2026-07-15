@@ -19,6 +19,7 @@ from agentsla.bench.report import (
     _aggregate,
     _fmt_truth,
     _markdown_table,
+    _render_real_llm_section,
 )
 from agentsla.bench.report import (
     main as report_main,
@@ -179,3 +180,152 @@ class TestReportCli:
         assert rc == 0
         text = out_path.read_text(encoding="utf-8")
         assert "Honest gap" not in text, "banner must not appear when verified_at_truth is measurable — would falsely claim a gap"
+
+
+def _real_llm_row(**overrides: object) -> dict:
+    base = {
+        "mode": "naked",
+        "task_id": "real-finops-001",
+        "domain": "financial_ops",
+        "model_id": "claude-haiku-4-5-20251001",
+        "seed": 0,
+        "success": True,
+        "gate_passed": False,
+        "verified_at_truth": True,
+        "sensitivity": None,
+        "specificity": None,
+        "latency_ms": 1500.0,
+        "text": "42",
+        "note": "",
+    }
+    base.update(overrides)
+    return base
+
+
+class TestRenderRealLlmSection:
+    """Tests for the auto-included Real-LLM bench section in REPORT.md.
+
+    Closes PRD-v2 §7 honest gap #2 ("README 'verifier caught X%' headline
+    depends on real_llm numbers"). The Real-LLM bench is the only path that
+    produces ``verified_at_truth`` values, so the section must surface the
+    naked-vs-wrapped comparison alongside the hermetic headline.
+    """
+
+    def test_section_renders_heading(self, tmp_path: Path) -> None:
+        """Section header must contain "Real-LLM" so CI grep + readers can locate it."""
+        parquet = tmp_path / "real_llm.parquet"
+        rows = [_real_llm_row(), _real_llm_row(mode="wrapped", gate_passed=True)]
+        _write_parquet(parquet, rows)
+        section = _render_real_llm_section(parquet)
+        assert "## Real-LLM bench" in section
+
+    def test_section_includes_naked_vs_wrapped_table(self, tmp_path: Path) -> None:
+        """Table header must be the same shape as the hermetic headline."""
+        parquet = tmp_path / "real_llm.parquet"
+        rows = [
+            _real_llm_row(mode="naked"),
+            _real_llm_row(mode="wrapped", gate_passed=True, verified_at_truth=True),
+        ]
+        _write_parquet(parquet, rows)
+        section = _render_real_llm_section(parquet)
+        # Columns mirror the hermetic headline + a "N rows" column so the
+        # reviewer sees sample size alongside the rate.
+        assert "| Mode | Success | Gate passed | Verified@truth | N rows | p95 (ms) |" in section
+        assert "| naked" in section
+        assert "| wrapped" in section
+
+    def test_section_aggregates_truth_per_mode(self, tmp_path: Path) -> None:
+        """verified_at_truth counts only rows where the field is non-None."""
+        parquet = tmp_path / "real_llm.parquet"
+        rows = [
+            _real_llm_row(mode="wrapped", verified_at_truth=True, gate_passed=True),
+            _real_llm_row(mode="wrapped", verified_at_truth=False, gate_passed=True),
+            _real_llm_row(mode="wrapped", verified_at_truth=None, gate_passed=True),
+            _real_llm_row(mode="naked", verified_at_truth=True),
+        ]
+        _write_parquet(parquet, rows)
+        section = _render_real_llm_section(parquet)
+        # Wrapped: 1 truth-true of 2 measured = 50%.
+        assert "50%" in section
+        # Naked: 1 truth-true of 1 measured = 100%.
+        assert "100%" in section
+
+    def test_section_aggregates_p95_per_mode(self, tmp_path: Path) -> None:
+        """p95 latency column must reflect the actual latencies, not zero.
+        Mirrors the hermetic :func:`_aggregate` index formula
+        ``latencies[int(0.95 * (n - 1))]`` so the two tables compute
+        p95 the same way and can be compared side by side.
+        """
+        parquet = tmp_path / "real_llm.parquet"
+        rows = [
+            _real_llm_row(mode="wrapped", latency_ms=1000.0),
+            _real_llm_row(mode="wrapped", latency_ms=2000.0),
+            _real_llm_row(mode="wrapped", latency_ms=3000.0),
+        ]
+        _write_parquet(parquet, rows)
+        section = _render_real_llm_section(parquet)
+        # n=3, p95 index = int(0.95 * 2) = 1 → latencies[1] = 2000.
+        assert "2000" in section
+
+    def test_section_names_model_id(self, tmp_path: Path) -> None:
+        """Reviewer must see which model produced the numbers — the headline
+        is model-specific (Haiku vs Sonnet have very different latencies).
+        """
+        parquet = tmp_path / "real_llm.parquet"
+        rows = [_real_llm_row(model_id="MiniMax-M3")]
+        _write_parquet(parquet, rows)
+        section = _render_real_llm_section(parquet)
+        assert "MiniMax-M3" in section
+
+    def test_section_emits_unmeasured_banner_when_all_rows_are_not_yet_measured(self, tmp_path: Path) -> None:
+        """If every row's note starts with [NOT YET MEASURED], the section
+        must say so — not pretend the columns are populated.
+        """
+        parquet = tmp_path / "real_llm.parquet"
+        rows = [
+            _real_llm_row(mode="naked", note="[NOT YET MEASURED] rate limit"),
+            _real_llm_row(mode="wrapped", note="[NOT YET MEASURED] rate limit"),
+        ]
+        _write_parquet(parquet, rows)
+        section = _render_real_llm_section(parquet)
+        assert "NOT YET MEASURED" in section, "section must surface the honest-gap marker"
+
+
+class TestReportAutoIncludesRealLlmSection:
+    """Integration check: main() auto-includes the Real-LLM section when
+    ``real_llm.parquet`` is adjacent to ``results.parquet`` — same contract as
+    ``parity.parquet`` and ``seeded_errors.parquet``.
+    """
+
+    def test_main_appends_section_when_real_llm_parquet_present(self, tmp_path: Path) -> None:
+        results = tmp_path / "results.parquet"
+        real_llm = tmp_path / "real_llm.parquet"
+        # Hermetic results: zero ground truth → banner must appear.
+        _write_parquet(results, [_row(), _row(mode="wrapped", verified=True)])
+        # Real-LLM parquet: populated with measured rows.
+        _write_parquet(
+            real_llm,
+            [
+                _real_llm_row(mode="wrapped", verified_at_truth=True, gate_passed=True),
+                _real_llm_row(mode="wrapped", verified_at_truth=False, gate_passed=True),
+            ],
+        )
+        out = tmp_path / "report.md"
+        rc = report_main(["--in", str(results), "--out", str(out)])
+        assert rc == 0
+        text = out.read_text(encoding="utf-8")
+        assert "## Real-LLM bench" in text
+        # The Real-LLM section must come AFTER the hermetic headline so the
+        # reader walks top-to-bottom: hermetic → parity → real-LLM.
+        assert text.index("Headline: naked vs wrapped") < text.index("## Real-LLM bench")
+
+    def test_main_omits_section_when_real_llm_parquet_absent(self, tmp_path: Path) -> None:
+        results = tmp_path / "results.parquet"
+        _write_parquet(results, [_row(), _row(mode="wrapped", verified=True)])
+        out = tmp_path / "report.md"
+        rc = report_main(["--in", str(results), "--out", str(out)])
+        assert rc == 0
+        text = out.read_text(encoding="utf-8")
+        assert "## Real-LLM bench" not in text
+        # Honest-gap banner still appears (no real-LLM data → still a gap).
+        assert "Honest gap" in text

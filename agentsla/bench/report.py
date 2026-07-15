@@ -89,6 +89,76 @@ def _markdown_table(naked: dict, wrapped: dict) -> str:
     return "\n".join(lines)
 
 
+def _render_real_llm_section(real_llm_path: Path) -> str:
+    """Render the Real-LLM bench section from ``real_llm.parquet``.
+
+    Closes PRD-v2 §7 honest gap #2: ``verified_at_truth`` is only measurable
+    when a real model is exercised against tasks with declared ground truth.
+    The hermetic EchoModel bench can never populate that column, so the
+    Real-LLM section is the only place a reviewer sees a real
+    "verifier-caught" number. The function is intentionally read-only — the
+    parquet is the source of truth, written by ``bench/real_llm.py``.
+
+    The section renders four artifacts:
+
+      1. Header with model_id so the numbers are not model-ambiguous.
+      2. Naked-vs-wrapped comparison table (same shape as the hermetic
+         headline so reviewers can pattern-match).
+      3. Honest-gap marker when every row is ``[NOT YET MEASURED]``.
+
+    Returns a markdown block (no trailing newline). Caller is responsible
+    for prefixing ``\\n\\n`` between blocks.
+    """
+    table = pq.read_table(real_llm_path)
+    rows = table.to_pylist()
+    if not rows:
+        return ""
+
+    # Aggregate per-mode (mirrors _aggregate for hermetic, but works against
+    # the real-LLM schema which lacks ``verified`` / ``injection_resisted``).
+    per_mode: dict[str, list[dict[str, object]]] = {"naked": [], "wrapped": []}
+    for r in rows:
+        per_mode.setdefault(str(r["mode"]), []).append(r)
+
+    # Pick the model_id from the first row — schema guarantees uniformity.
+    model_id = str(rows[0].get("model_id") or "unknown")
+
+    all_unmeasured = all(str(r.get("note", "")).startswith("[NOT YET MEASURED]") for r in rows)
+    lines: list[str] = [
+        "## Real-LLM bench",
+        "",
+        f"_Generated from `{real_llm_path}`. Model: `{model_id}`. This is the only path that produces "
+        "measured `verified_at_truth` numbers — the hermetic EchoModel bench cannot._",
+        "",
+    ]
+
+    if all_unmeasured:
+        lines.append(
+            "> **Honest gap — every row is `[NOT YET MEASURED]`.** "
+            "The harness path is real (CLI + tests + parquet schema), but the live model "
+            "was never exercised against the bench (e.g. ANTHROPIC_API_KEY was unset, or "
+            "the remote run was rate-limited). Re-run `agentsla bench-real` to populate."
+        )
+        return "\n".join(lines) + "\n"
+
+    lines.append("| Mode | Success | Gate passed | Verified@truth | N rows | p95 (ms) |")
+    lines.append("|------|--------:|------------:|---------------:|-------:|---------:|")
+    for mode in ("naked", "wrapped"):
+        subset = per_mode.get(mode, [])
+        n = len(subset)
+        if n == 0:
+            lines.append(f"| {mode} | n/a | n/a | n/a | 0 | n/a |")
+            continue
+        n_success = sum(1 for r in subset if r["success"])
+        n_gate = sum(1 for r in subset if r["gate_passed"])
+        truth_rows = [r for r in subset if r.get("verified_at_truth") is not None]
+        truth_pct = (sum(1 for r in truth_rows if r["verified_at_truth"]) / len(truth_rows)) if truth_rows else None
+        latencies = sorted(float(r["latency_ms"]) for r in subset)
+        p95 = latencies[int(0.95 * (n - 1))] if n > 1 else latencies[0]
+        lines.append(f"| {mode} | {n_success / n:.0%} | {n_gate / n:.0%} | {_fmt_truth(truth_pct)} | {n} | {p95:.0f} |")
+    return "\n".join(lines) + "\n"
+
+
 def _render_seeded_section(seeded_path: Path) -> str:
     """Render the seeded-errors section from ``seeded_errors.parquet``.
 
@@ -253,6 +323,14 @@ def main(argv: list[str] | None = None) -> int:
     eval_path = args.in_path.parent / "eval_classifier.md"
     if eval_path.exists():
         md += "\n" + eval_path.read_text(encoding="utf-8")
+
+    # Optional: append Real-LLM bench section if ``real_llm.parquet`` exists
+    # adjacent. Source of truth = ``bench/real_llm.py``. This is the only path
+    # that produces a measured ``verified_at_truth`` number; the hermetic
+    # bench can never populate it. Closes PRD-v2 §7 honest gap #2.
+    real_llm_path = args.in_path.parent / "real_llm.parquet"
+    if real_llm_path.exists():
+        md += "\n\n" + _render_real_llm_section(real_llm_path).rstrip("\n")
 
     if args.out:
         args.out.write_text(md, encoding="utf-8")
