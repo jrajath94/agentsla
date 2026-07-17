@@ -22,13 +22,13 @@ format:  ## Auto-format the tree.
 	uv run ruff check --fix .
 
 type:  ## mypy --strict on the three target modules (TYPING-01).
-	uv run mypy agentsla/core
+	uv run mypy agentsla/core agentsla/policy agentsla/verify
 
 test:  ## Pytest, no coverage gating. Fast.
 	uv run pytest -q
 
 coverage:  ## pytest with coverage report; enforces ≥85% floor (COVERAGE-01).
-	uv run pytest --cov=agentsla/core --cov-report=term-missing --cov-fail-under=85
+	uv run pytest --cov=agentsla/core --cov=agentsla/policy --cov=agentsla/verify --cov-report=term-missing --cov-fail-under=85
 
 bench:  ## Run the bench harness (Phase 5 surface; stubbed until W8).
 	uv run agentsla bench --all
