@@ -74,6 +74,23 @@ def test_bench_main_callable() -> None:
     assert callable(bench_main)
 
 
+def test_all_flag_is_a_real_cli_arg() -> None:
+    """The README/Makefile one-liner is `agentsla bench --all`. The flag must
+    exist in the REAL parser (not just docs) — a docs-only flag makes the
+    documented repro command exit 2 with 'unrecognized arguments'.
+    """
+    import subprocess
+
+    result = subprocess.run(
+        [sys.executable, "-m", "agentsla", "bench", "--help"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--all" in result.stdout, "`agentsla bench --all` is documented in README/Makefile; the parser must accept it"
+
+
 def test_no_metrics_server_when_port_unset() -> None:
     """End-to-end behavior pin: --metrics-port omitted → server stays off.
 

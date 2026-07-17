@@ -318,6 +318,15 @@ def _aggregate(rows: list[BenchRow], *, mode: str) -> BenchAggregate:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="agentsla-bench", description="Run the AgentSLA bench harness.")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help=(
+            "Run the full hermetic suite (all tasks + injection variants). This is already the "
+            "default behavior; the flag exists so the documented `agentsla bench --all` one-liner "
+            "is a real command, not a docs-only incantation."
+        ),
+    )
     parser.add_argument("--out", type=Path, default=Path("bench/results/results.parquet"), help="Output parquet path.")
     parser.add_argument("--db", type=Path, default=Path(".agentsla/bench.duckdb"), help="Trace-store DuckDB path.")
     parser.add_argument("--seeds", type=int, default=5, help="Number of seeds per (mode, task).")
