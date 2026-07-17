@@ -2,6 +2,76 @@
 
 All notable changes to AgentSLA are recorded here. Dates are UTC.
 
+## [v1.1.0] — 2026-07-17 — Minor: bench-real cost guards + structural-replay honesty pass
+
+`bench-real` is the repo's only paid path. Before this release a
+mistyped flag could fire dozens of paid API calls; now an accidental
+large run is impossible by default, and the docs no longer claim a
+replay capability the code does not ship.
+
+### Added
+
+- **`bench-real` cost guards** (`agentsla/bench/real_llm.py`):
+  - `--dry-plan` — prints the run plan (model, tasks, prompts, rows,
+    cache hits, estimated paid calls, output path) with zero network
+    access and no API key required.
+  - `--max-paid-calls` (default **3**) — the run refuses to start
+    (exit 2) when uncached prompts exceed the cap; larger runs must
+    raise it explicitly per the frugal ladder.
+  - **Response cache** at `bench/cache/real_llm` keyed
+    `sha256(model, task_id, prompt, seed)`; live calls always
+    populate it. `--resume` serves cached prompts at zero paid cost
+    and marks those rows `cached=true` in the parquet.
+  - `--overwrite` — required to clobber an existing output parquet;
+    committed live evidence can no longer be silently regenerated.
+  - **Fail-fast default** — the run stops after the first provider
+    error, keeps the partial parquet, and exits 1 (`--no-fail-fast`
+    opts back into record-and-continue).
+  - **Stratified task selection** — `--tasks-per-domain 1` now takes
+    the first task of *each* domain instead of the first three rows
+    of a domain-grouped corpus, so the 3-prompt smoke run covers all
+    three domains.
+- **`docs/GPU_API_COST_OPTIMIZATION.md`** — source of truth for the
+  paid-call ladder: hermetic CPU evidence first, 3-prompt live smoke
+  second (Rung C), escalation to Rung D (9 prompts) / Rung E (12
+  prompts — corpus max) only when a smoke run changes a conclusion.
+- **`agentsla bench --all`** — README documented the flag but the
+  harness parser rejected it; it now parses (full suite is already
+  the default behavior).
+- **Test coverage** — 33 new cases across
+  `tests/unit/bench/test_real_llm.py` (dry-plan, cache round-trip,
+  paid-call cap, resume, overwrite refusal, fail-fast) and
+  `tests/unit/bench/test_harness_cli.py` (`--all`).
+
+### Changed
+
+- **Makefile `type` + `coverage` targets** now gate
+  `agentsla/core`, `agentsla/policy`, AND `agentsla/verify`
+  (CLAUDE.md requires ≥85% on all three; measured 94.6% at this tag).
+- **Replay wording honesty pass** — README, WRITEUP, PRD/TRD,
+  failure-modes, class-taxonomy, and the `agentsla/core/replay.py`
+  module docstring now say **structural replay** (recorded tool-call
+  hash re-validation + stored final answer), never "deterministic
+  re-execution"; adapter-driven replay with stubbed tool results is
+  explicitly documented as not shipped.
+- **REPORT honest-gap banner** recommends the 3-prompt smoke command
+  (`--tasks-per-domain 1 --seeds 1`) instead of the 15-prompt
+  default, and points at the frugal ladder before escalating.
+
+### Removed
+
+- Stale README limitation about per-endpoint range multipliers
+  (`$4.2M-$4.5M`) — fixed by the v1 F7 range-parser work in
+  `agentsla/verify/claims.py`; the limitation no longer exists.
+
+### Source of truth
+
+- Implementation: `agentsla/bench/real_llm.py` (cost guards),
+  `agentsla/bench/harness.py` (`--all`).
+- Tests: `tests/unit/bench/test_real_llm.py`,
+  `tests/unit/bench/test_harness_cli.py`.
+- Ladder: `docs/GPU_API_COST_OPTIMIZATION.md`.
+
 ## [v1.0.1] — 2026-07-15 — Patch: standalone Prometheus exporter (`agentsla metrics serve`)
 
 The v1.0.0 Tier-1 release shipped the metric families

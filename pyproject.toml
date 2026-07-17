@@ -1,6 +1,6 @@
 [project]
 name = "agentsla"
-version = "1.0.1"
+version = "1.1.0"
 description = "SLO-aware reliability runtime for tool-calling LLM agents."
 readme = "README.md"
 license = { file = "LICENSE" }
