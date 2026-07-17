@@ -6,6 +6,8 @@ Usage:
     python -m agentsla bench [--all] [--seeds N] [--out PATH]
     python -m agentsla bench-seeded-errors [--strategies 0,10,50,100] [--trials N]
     python -m agentsla bench-real [--model M] [--tasks-per-domain N] [--out PATH]
+                                  [--dry-plan] [--max-paid-calls N] [--cache-dir DIR]
+                                  [--resume] [--overwrite] [--no-fail-fast]
     python -m agentsla report [--in PATH] [--out PATH]
 """
 

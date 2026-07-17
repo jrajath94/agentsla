@@ -162,6 +162,254 @@ class TestResolveApiKey:
             _resolve_api_key(None)
 
 
+def _raise_if_called(prompt: str, *, model: str, api_key: str | None) -> str:
+    raise AssertionError("_call_claude must NOT be invoked in this test — a paid API call would have happened")
+
+
+class TestDryPlan:
+    def test_dry_plan_performs_zero_api_calls_and_needs_no_key(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """--dry-plan must work with no key and never touch _call_claude."""
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+        from agentsla.bench.real_llm import main
+
+        out_path = tmp_path / "plan.parquet"
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=_raise_if_called):
+            rc = main(
+                [
+                    "--dry-plan",
+                    "--tasks-per-domain",
+                    "1",
+                    "--seeds",
+                    "1",
+                    "--out",
+                    str(out_path),
+                    "--cache-dir",
+                    str(tmp_path / "cache"),
+                ]
+            )
+        assert rc == 0, "dry plan must exit 0 without a key"
+        assert not out_path.exists(), "dry plan must not write a parquet"
+
+    def test_plan_counts_prompts_rows_and_domains(self, tmp_path: Path) -> None:
+        from agentsla.bench.real_llm import plan_real_llm_bench
+
+        plan = plan_real_llm_bench(tasks_per_domain=2, seeds=2, out_path=tmp_path / "o.parquet")
+        assert plan.n_tasks == 6, "2 per domain * 3 domains"
+        assert plan.n_prompts == 12, "tasks * seeds"
+        assert plan.n_rows == 24, "2 modes per prompt"
+        assert plan.n_live_calls == 12, "no cache => every prompt is a paid call"
+        assert plan.out_exists is False
+        rendered = plan.render()
+        assert "PAID API calls: 12" in rendered
+
+    def test_smoke_plan_covers_all_three_domains(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Rung C acceptance: tasks-per-domain=1 must select one task from EACH domain."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+
+        def _fake_call(prompt: str, *, model: str, api_key: str | None) -> str:
+            return "42"
+
+        from agentsla.bench.real_llm import run_real_llm_bench
+
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=_fake_call):
+            out_path = tmp_path / "smoke.parquet"
+            run_real_llm_bench(tasks_per_domain=1, seeds=1, out_path=out_path)
+        domains = set(pq.read_table(out_path).column("domain").to_pylist())
+        assert domains == {"financial_ops", "incident_triage", "doc_qa"}, f"smoke run must be stratified across domains; got {domains}"
+
+
+class TestMaxPaidCalls:
+    def test_blocks_accidental_large_run_before_any_call(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+        from agentsla.bench.real_llm import run_real_llm_bench
+
+        out_path = tmp_path / "big.parquet"
+        with (
+            patch("agentsla.bench.real_llm._call_claude", side_effect=_raise_if_called),
+            pytest.raises(RuntimeError, match="max-paid-calls"),
+        ):
+            run_real_llm_bench(tasks_per_domain=2, seeds=1, out_path=out_path, max_paid_calls=3)
+        assert not out_path.exists(), "refused run must not write a parquet"
+
+    def test_cli_default_cap_is_3(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Default CLI invocation with tasks-per-domain=2 (6 prompts) must refuse."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+        from agentsla.bench.real_llm import main
+
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=_raise_if_called):
+            rc = main(
+                [
+                    "--tasks-per-domain",
+                    "2",
+                    "--seeds",
+                    "1",
+                    "--out",
+                    str(tmp_path / "big.parquet"),
+                    "--cache-dir",
+                    str(tmp_path / "cache"),
+                ]
+            )
+        assert rc == 2, "6 planned paid calls > default cap of 3 must exit 2"
+
+    def test_raised_cap_allows_run(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+
+        def _fake_call(prompt: str, *, model: str, api_key: str | None) -> str:
+            return "42"
+
+        from agentsla.bench.real_llm import run_real_llm_bench
+
+        out_path = tmp_path / "ok.parquet"
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=_fake_call):
+            rows = run_real_llm_bench(tasks_per_domain=2, seeds=1, out_path=out_path, max_paid_calls=6)
+        assert len(rows) == 12
+        assert out_path.exists()
+
+
+class TestResponseCache:
+    def test_cache_hit_does_not_invoke_call_claude(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Second run with --resume must serve every response from cache."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+        from agentsla.bench.real_llm import run_real_llm_bench
+
+        cache_dir = tmp_path / "cache"
+
+        def _fake_call(prompt: str, *, model: str, api_key: str | None) -> str:
+            return f"first-run-answer:{prompt[:20]}"
+
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=_fake_call):
+            first = run_real_llm_bench(tasks_per_domain=1, seeds=1, out_path=tmp_path / "a.parquet", cache_dir=cache_dir)
+        assert all(not r.cached for r in first), "live rows must not be marked cached"
+
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=_raise_if_called):
+            second = run_real_llm_bench(
+                tasks_per_domain=1,
+                seeds=1,
+                out_path=tmp_path / "b.parquet",
+                cache_dir=cache_dir,
+                resume=True,
+            )
+        assert len(second) == len(first)
+        assert all(r.cached for r in second), "resume rows must be marked cached"
+        assert {r.text for r in second} == {r.text for r in first}, "cached text must match the original responses"
+
+    def test_resume_run_needs_no_api_key_when_fully_cached(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+        from agentsla.bench.real_llm import run_real_llm_bench
+
+        cache_dir = tmp_path / "cache"
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=lambda prompt, *, model, api_key: "42"):
+            run_real_llm_bench(tasks_per_domain=1, seeds=1, out_path=tmp_path / "a.parquet", cache_dir=cache_dir)
+
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=_raise_if_called):
+            rows = run_real_llm_bench(
+                tasks_per_domain=1,
+                seeds=1,
+                out_path=tmp_path / "b.parquet",
+                cache_dir=cache_dir,
+                resume=True,
+            )
+        assert rows, "fully cached resume run must work offline without a key"
+
+    def test_without_resume_cache_is_not_read(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Cache reads are opt-in: no --resume => live call happens even with a warm cache."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+        from agentsla.bench.real_llm import run_real_llm_bench
+
+        cache_dir = tmp_path / "cache"
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=lambda prompt, *, model, api_key: "old"):
+            run_real_llm_bench(tasks_per_domain=1, seeds=1, out_path=tmp_path / "a.parquet", cache_dir=cache_dir)
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=lambda prompt, *, model, api_key: "new") as mocked:
+            rows = run_real_llm_bench(tasks_per_domain=1, seeds=1, out_path=tmp_path / "b.parquet", cache_dir=cache_dir)
+        assert mocked.called, "without resume, the live path must be exercised"
+        assert all(r.text == "new" for r in rows)
+
+
+class TestOverwriteProtection:
+    def test_existing_output_refused_without_overwrite(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+        from agentsla.bench.real_llm import run_real_llm_bench
+
+        out_path = tmp_path / "existing.parquet"
+        out_path.write_bytes(b"precious prior artifact")
+        with (
+            patch("agentsla.bench.real_llm._call_claude", side_effect=_raise_if_called),
+            pytest.raises(RuntimeError, match="overwrite"),
+        ):
+            run_real_llm_bench(tasks_per_domain=1, seeds=1, out_path=out_path)
+        assert out_path.read_bytes() == b"precious prior artifact", "refused run must leave the artifact untouched"
+
+    def test_overwrite_flag_allows_replacement(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+        from agentsla.bench.real_llm import run_real_llm_bench
+
+        out_path = tmp_path / "existing.parquet"
+        out_path.write_bytes(b"old")
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=lambda prompt, *, model, api_key: "42"):
+            rows = run_real_llm_bench(tasks_per_domain=1, seeds=1, out_path=out_path, overwrite=True)
+        assert rows
+        assert pq.read_table(out_path).num_rows == len(rows)
+
+
+class TestFailFast:
+    def test_fail_fast_stops_after_first_api_error(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+        from agentsla.bench.real_llm import run_real_llm_bench
+
+        def _always_fail(prompt: str, *, model: str, api_key: str | None) -> str:
+            raise ConnectionError("simulated provider outage")
+
+        out_path = tmp_path / "partial.parquet"
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=_always_fail):
+            rows = run_real_llm_bench(tasks_per_domain=2, seeds=1, out_path=out_path, max_paid_calls=6)
+        # 6 tasks planned, but fail-fast stops after the FIRST error: 2 rows (naked+wrapped).
+        assert len(rows) == 2, f"fail-fast must stop after the first error; got {len(rows)} rows"
+        assert all(r.note.startswith("[NOT YET MEASURED]") for r in rows)
+        assert out_path.exists(), "partial parquet must be kept (honest artifact)"
+
+    def test_no_fail_fast_records_every_error_row(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+        from agentsla.bench.real_llm import run_real_llm_bench
+
+        def _always_fail(prompt: str, *, model: str, api_key: str | None) -> str:
+            raise ConnectionError("simulated provider outage")
+
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=_always_fail):
+            rows = run_real_llm_bench(
+                tasks_per_domain=2,
+                seeds=1,
+                out_path=tmp_path / "all_errors.parquet",
+                max_paid_calls=6,
+                fail_fast=False,
+            )
+        assert len(rows) == 12, "without fail-fast, every (task, seed) must emit its error rows"
+
+    def test_cli_exits_1_when_fail_fast_triggers(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+        from agentsla.bench.real_llm import main
+
+        def _always_fail(prompt: str, *, model: str, api_key: str | None) -> str:
+            raise ConnectionError("simulated provider outage")
+
+        with patch("agentsla.bench.real_llm._call_claude", side_effect=_always_fail):
+            rc = main(
+                [
+                    "--tasks-per-domain",
+                    "1",
+                    "--seeds",
+                    "1",
+                    "--out",
+                    str(tmp_path / "partial.parquet"),
+                    "--cache-dir",
+                    str(tmp_path / "cache"),
+                ]
+            )
+        assert rc == 1, "fail-fast abort must exit 1 so scripts notice the partial run"
+
+
 class TestBothModesEmitted:
     def test_parquet_contains_both_naked_and_wrapped(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         """PRD F3 requires naked-vs-wrapped comparison. Run with mocked Claude
