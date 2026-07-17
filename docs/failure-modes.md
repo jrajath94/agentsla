@@ -127,9 +127,9 @@ data; the metric does not distinguish.
 **v0.1 status**: Documented in `WRITEUP.md § "Where we fell short"`.
 
 **Mitigation**: Replace the synthetic eval set with traces recorded
-from a live Claude API replay (which the bench infrastructure
-already supports — `TraceWriter` is the same). v0.2 work; not in
-v0.1.
+from live Claude API calls (the recording path —
+`TraceWriter` — is the same; the harness just needs a real client).
+v0.2 work; not in v0.1.
 
 ---
 
@@ -239,20 +239,25 @@ the parsed `(low, high)` matches the expected.
 
 **Trigger**: The real-LLM bench (`python -m agentsla bench-real`) hits
 Claude's rate limit mid-run. v0.1 had no real-LLM bench; v1 added one
-with a 30-row default × `tasks_per_domain=5` × 3 domains = ~45 calls.
+(the ground-truthable corpus is 12 tasks — 4 per domain — so the
+largest single-seed run is 12 prompts / 24 rows).
 
 **Why it breaks**: Without graceful degradation, a rate-limit error
-aborts the run and writes zero rows. The operator is left wondering
-which calls succeeded.
+aborts the run and writes zero rows — and naive retries burn more paid
+calls against an already-limited key.
 
-**v1 status**: Mitigated. Every `_call_claude` exception becomes a row
-tagged `[NOT YET MEASURED] <exc>` with `success=false`. The parquet
-remains partially valid; the bench CLI exits 0 with a count of
-unmeasured rows in the summary.
+**Current status**: Mitigated twice over. Every `_call_claude`
+exception becomes a row tagged `[NOT YET MEASURED] <exc>` with
+`success=false`, so the parquet stays honest. Fail-fast is the
+default: the run stops after the FIRST provider error, keeps the
+partial parquet, and exits 1 (`--no-fail-fast` opts back into
+record-and-continue). `--max-paid-calls` (default 3) bounds the blast
+radius of any retry loop.
 
 **Observable signal**: `python -m agentsla bench-real` prints
-`[NOT YET MEASURED] rows: N/M` in the summary. Operators can re-run
-later (rows are deterministic — same `seed` yields the same tasks).
+`[NOT YET MEASURED] rows: N/M` plus a fail-fast notice. Re-runs with
+`--resume` serve already-answered prompts from `bench/cache/real_llm`
+at zero paid cost and only pay for the missing ones.
 
 **Mitigation**: For production deployments, switch to batched API
 calls (`anthropic.Anthropic.messages.batch.create`) which has higher

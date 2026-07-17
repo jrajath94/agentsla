@@ -1,28 +1,33 @@
-"""Deterministic replay engine (TRACE-04, TRACE-05).
+"""Structural replay engine (TRACE-04, TRACE-05).
 
-Re-running a recorded trace with tool results stubbed, in two modes:
+This module ships a *structural* replay primitive, not an adapter-driven
+one. It validates that a recorded trace is self-consistent and returns
+the trace's stored final answer; it does not re-drive the adapter loop
+with stubbed tool outputs.
 
-  * ``strict``  — every ``ToolCall`` must hash-equal the recorded call.
-                 Drift raises :class:`ToolCallDriftError` and the report's
+Two modes:
+
+  * ``strict``  — every recorded ``ToolCall`` must hash-equal the value
+                 recomputed from its recorded ``args``. Drift raises
+                 :class:`ToolCallDriftError` and the report's
                  ``exit_code`` is ``1``. Use case: regression test that
-                 the agent is replay-safe across runs.
+                 the recorded log is replay-safe across reads.
 
-  * ``tolerant`` — stubs results regardless of argument drift. Use case:
-                 planning-stability debug (the agent changed which args
-                 it passes; you want to compare resulting answers).
+  * ``tolerant`` — drift is recorded in the report but the run does not
+                 raise. Use case: triage of a drifted log; the diff list
+                 is the artifact, not a hard failure.
 
-Structural replay (this module):
-  For every ``ToolCall`` event in the trace, re-derive ``args_hash`` from
-  ``args`` and compare against the recorded ``args_hash``. Matches/drift
-  are collected. This proves the recorded log is *self-consistent*: it
-  catches a hash that drifted between write and read (PITFALL #1 mitigation).
+For every ``ToolCall`` event in the trace, the engine re-derives
+``args_hash`` from ``args`` (canonical JSON, ``sort_keys=True``) and
+compares it against the recorded ``args_hash``. Matches and drift are
+collected; the report's ``final_answer`` is the stored final answer
+byte-for-byte (always equal across replays by construction —
+adapter-driven re-execution with stubbed tool results is not shipped).
 
-Full replay (plan 01.5/01.6 — rawloop + REPLAY-PROOF):
-  Drives the recorded ``ModelMessage`` events back through a stub model +
-  deterministic tool set to reproduce the final answer byte-for-byte.
-  When the rawloop adapter ships, ``replay(trace_id, adapter=...)`` will
-  complete that path. Until then the report's ``final_answer`` falls back
-  to the stored value (always equal across replays by construction).
+Honesty constraint: this engine does *not* rerun the agent. A reviewer
+who wants adapter-driven replay must either install the replay hook
+themselves or treat this report as a hash-validation audit, not as
+re-execution evidence.
 
 Public surface (5 classes + 1 function):
 

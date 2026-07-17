@@ -3,15 +3,15 @@
 A side-by-side framing of AgentSLA against the four most-adopted
 commercial / open-source LLM-observability stacks as of 2026-07. The
 intent is to position AgentSLA honestly: where it overlaps with the
-incumbents (observability, traces), where it diverges (deterministic
+incumbents (observability, traces), where it diverges (structural
 replay, SLO-grade verification), and where it does not try to compete
 (realtime dashboards, hosted SaaS, eval-marketplace).
 
 Scope of comparison: the **runtime guarantees** AgentSLA ships — the
 four guarantees named in `WRITEUP.md § Headline`:
 
-1. Verification gate (post-execution claim recomputation).
-2. Deterministic replay (strict + tolerant modes).
+1. Verification gate (numeric claim recomputation today).
+2. Structural replay (strict + tolerant modes).
 3. Budget enforcement (token + cost + wall-clock).
 4. Failure taxonomy (14 categories, two-stage classification).
 
@@ -21,14 +21,14 @@ four guarantees named in `WRITEUP.md § Headline`:
 |---|:--:|:--:|:--:|:--:|:--:|
 | **Append-only trace log** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Hosted SaaS** | — | ✓ | ✓ | ✓ | ✓ |
-| **Deterministic replay** | ✓ (strict + tolerant) | — | — | — | — |
-| **Post-execution verification gate** | ✓ (numeric, schema, grounding) | partial (eval chains) | partial (eval chains) | — | ✓ (scorers) |
+| **Structural replay** | ✓ (strict + tolerant) | — | — | — | — |
+| **Post-execution verification gate** | ✓ (numeric claim recomputation today) | partial (eval chains) | partial (eval chains) | — | ✓ (scorers) |
 | **Tool-call policy gate (egress regex)** | ✓ | — | — | — | — |
 | **Token / cost budget enforcement** | ✓ | partial (cost tracking) | partial (cost tracking) | ✓ (cost-only) | partial |
 | **Wall-clock deadline enforcement** | ✓ | — | — | — | — |
 | **Failure taxonomy (machine-readable)** | ✓ (14 categories) | partial (custom tags) | partial (custom tags) | — | partial (custom scorers) |
 | **Two-stage classifier (heuristic + LLM judge)** | ✓ | — | — | — | ✓ |
-| **Offline / hermetic replay of captured traces** | ✓ | — | — | — | — |
+| **Offline / hermetic structural replay of captured traces** | ✓ | — | — | — | — |
 | **Local-first (no cloud required)** | ✓ | — | ✓ (self-host) | — | — |
 | **Open-source under MIT** | ✓ | partial (closed SaaS) | ✓ (MIT) | partial (AGPL-3) | partial |
 
@@ -53,17 +53,20 @@ taxonomy to the user.
 
 ## Where AgentSLA diverges — the three guarantees
 
-### 1. Deterministic replay (no incumbent ships this)
+### 1. Structural replay (no incumbent ships this)
 
 The `TraceReader.iter_events(trace_id)` path + canonical-JSON
-`args_hash` lets AgentSLA re-execute a recorded agent run with
-byte-identical tool arguments and compare against the original tool
-results. The two modes:
+`args_hash` lets AgentSLA structurally replay a recorded trace by
+recomputing each recorded tool-call hash, surfacing drift, and
+returning the stored final answer. The two modes:
 
 * **Strict** — every `ToolCall.args_hash` must match exactly. Any
-  drift raises a `ReplayDriftError` and aborts.
-* **Tolerant** — drift is recorded but the replay continues; the diff
-  is summarized as a `ReplayDriftReport` for triage.
+  drift raises a replay error and aborts.
+* **Tolerant** — drift is recorded but the replay continues so the
+  report can be used for triage.
+
+Adapter-driven re-execution with stubbed tool results is planned but
+not shipped in the current replay engine.
 
 LangSmith/Langfuse ship "replay" as "re-run this trace in the UI to
 re-observe the same calls" — that is a debugging affordance, not a
@@ -126,7 +129,7 @@ evals, not policy.
 | Open-source self-host, basic observability | Langfuse |
 | Cost / rate limiting for an OpenAI-key-only deployment | Helicone |
 | Eval pipeline with custom scorers, scoring-as-a-service | Braintrust |
-| **Deterministic replay of tool-calling agents** | AgentSLA |
+| **Structural replay of tool-calling agent traces (hash validation + stored-answer recovery; not re-execution)** | AgentSLA |
 | **Post-execution claim recomputation (numerical correctness)** | AgentSLA |
 | **Egress / data-exfiltration policy on tool calls** | AgentSLA |
 | **A reliability layer that wraps any tool-calling agent (LangGraph, Claude Agent SDK, raw-loop) without owning the agent runtime** | AgentSLA |

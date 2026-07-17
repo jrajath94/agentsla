@@ -13,7 +13,7 @@ AgentSLA is an **SLO-aware reliability runtime** that wraps any tool-calling LLM
 
 1. **Policy enforcement** — every tool call passes a declarative YAML policy (allowed tools, JSON-Schema validation, per-tool/per-trace call caps, egress regex pack) before execution.
 2. **Post-generation verification** — every numeric claim in the final answer is recomputed against source tool results; the gate emits a `Verdict` event with `coverage` (fraction of claims checked) and `incorrect` count.
-3. **Deterministic replay** — every run is captured as an append-only event log; `agentsla replay <trace_id>` re-executes with stubbed tool results, converting flaky agent failures into reproducible test cases.
+3. **Structural replay** — every run is captured as an append-only event log; `agentsla replay <trace_id>` re-validates recorded tool-call hashes and returns the recorded final answer, converting trace drift into a reproducible audit signal. Adapter-driven re-execution with stubbed tool results is not shipped.
 4. **Failure attribution** — every failed trace is labeled with one of 14 categories via a two-stage classifier (heuristic → LLM judge) and emitted as a Prometheus counter.
 
 It is the **reliability layer for agents** — the thing that turns "agent demoed well" into "agent runs in production with an SLA."

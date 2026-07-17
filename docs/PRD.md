@@ -12,7 +12,7 @@ AgentSLA is an **SLO-aware reliability runtime** that wraps any tool-calling LLM
 
 1. **Policy enforcement** — every tool call passes a declarative YAML policy (allowed tools, JSON-Schema validation, per-tool/per-trace call caps, egress regex pack) before execution.
 2. **Post-generation verification** — every numeric claim in the final answer is recomputed against source tool results; the gate emits a `Verdict` event with `coverage` (fraction of claims checked) and `incorrect` count.
-3. **Deterministic replay** — every run is captured as an append-only event log; `agentsla replay <trace_id>` re-executes with stubbed tool results, converting flaky agent failures into reproducible test cases.
+3. **Structural replay** — every run is captured as an append-only event log; `agentsla replay <trace_id>` re-validates recorded tool-call hashes and returns the recorded final answer, converting trace drift into a reproducible audit signal without claiming full adapter re-execution.
 4. **Failure attribution** — every failed trace is labeled with one of 14 categories via a two-stage classifier (heuristic → LLM judge) and emitted as a Prometheus counter.
 
 It is the **reliability layer for agents** — the thing that turns "agent demoed well" into "agent runs in production with an SLA."
@@ -26,10 +26,10 @@ It is the **reliability layer for agents** — the thing that turns "agent demoe
 | **LangSmith** (LangChain) | Trace UI, prompt eval | No policy enforcement, no numeric recompute, no failure taxonomy |
 | **Langfuse** | OSS tracing + eval | No pre-execution gate, no per-claim verification |
 | **Helicone** | LLM proxy + caching | No agent-aware hooks (tool calls are invisible), no verification |
-| **Braintrust** | Eval framework | No append-only trace log, no replay, no egress control |
+| **Braintrust** | Eval framework | No append-only trace log, no structural replay, no egress control |
 | **Arize Phoenix** | Drift + observability | No agent control plane |
 
-AgentSLA is the **only** tool-calling-agent runtime that ships all four guarantees together, with deterministic replay as a first-class primitive.
+AgentSLA is the **only** tool-calling-agent runtime here that ships all four guarantees together, with replay-safe append-only traces as a first-class primitive.
 
 ---
 
@@ -52,7 +52,7 @@ The five signals the Anthropic Staff rubric screens for, and how AgentSLA eviden
 ### 3.1 MUST (v0.1 — already shipped, hardening remaining)
 
 - **F1. Trace store.** Append-only event log over DuckDB+Parquet with strict ordering by `(trace_id, seq)`. ✓ shipped.
-- **F2. Replay.** Strict + tolerant modes; args_hash drift detection. ✓ shipped.
+- **F2. Replay.** Strict + tolerant structural replay; args_hash drift detection. ✓ shipped.
 - **F3. Policy gate.** Declarative YAML → Pydantic-frozen → runtime decision. Five-step evaluation (membership → schema → per-tool counts → global count → egress). ✓ shipped.
 - **F4. Egress pack.** PAN-Luhn, SSN, AWS key, JWT — real-format defaults + tenant-extensible. ✓ shipped.
 - **F5. Budget manager.** Token/cost/call/wall-time with 4-level degradation (FULL → REDUCED → MINIMAL → EMERGENCY). ✓ shipped.
@@ -65,7 +65,7 @@ The five signals the Anthropic Staff rubric screens for, and how AgentSLA eviden
 ### 3.2 MUST (v0.1 hardening — gaps to close)
 
 - **F11. Unified `ClaimVerdict` schema.** One type, one source of truth. Eliminate the pydantic-vs-dataclass drift. → P0.
-- **F12. Bench writes `Verdict` events to DuckDB.** Currently the trace store never contains a verdict event. The replay path can never re-run the verifier because no verdict was recorded. → P0.
+- **F12. Bench writes `Verdict` events to DuckDB.** Closed in v0.2; wrapped bench runs now persist verdict events. Structural replay still does not drive the adapter loop. → deferred follow-on, not a v0.2 blocker.
 - **F13. Honest `verified_pct` metric.** Distinguish "verification ran without exception" from "claims recompute-passed against ground truth." Reframe headline. → P0.
 - **F14. CI integration gate.** grep-level check that `bench/harness.py` imports `PolicyGate` + `Classifier` + `JsonlLabelSink` + `build_metrics`. Prevents silent wiring loss. → P1.
 - **F15. Architecture diagram** in WRITEUP (mermaid or PNG). → P1.
@@ -73,7 +73,7 @@ The five signals the Anthropic Staff rubric screens for, and how AgentSLA eviden
 
 ### 3.3 SHOULD (v0.2)
 
-- **F17. Live-LLM bench.** Record real Claude API traces (Haiku 4.5); replay through bench; measure real SLO attainment. → 1 GPU day.
+- **F17. Live-LLM bench.** Record real Claude API traces (Haiku 4.5); feed them through the same report path; measure real SLO attainment. → 1 GPU day.
 - **F18. Cross-adapter parity bench.** Same task under Claude SDK + LangGraph + rawloop, byte-identical policy decisions. → 0.5 GPU day.
 - **F19. Property-based tests** for policy gate (Hypothesis) + classifier (≥80% coverage on heuristics.py).
 - **F20. Async trace writer** with backpressure (closes DuckDB single-writer lock failure mode).
@@ -113,6 +113,7 @@ The five signals the Anthropic Staff rubric screens for, and how AgentSLA eviden
 7. ✓ `bench/results/REPORT.md` shows seeded-error experiment with sensitivity ≥85% @ ±50% perturbation, specificity ≥90% @ 0% perturbation.
 8. ✓ No "two `ClaimVerdict` types" remain in the codebase.
 9. ✓ `bench/harness.py` writes `Verdict` events to the trace store (verified via `agentsla report` or DuckDB query).
+10. Structural replay is documented honestly as hash validation + recorded-answer recovery, not adapter-driven re-execution.
 
 ---
 

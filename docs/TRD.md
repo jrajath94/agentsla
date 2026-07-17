@@ -64,12 +64,14 @@ class Event = Annotated[
 
 | Public surface | Invariant |
 |---|---|
-| `replay(trace_id, db_path, *, mode)` | Returns `ReplayReport`. `exit_code=0` on pass; `exit_code=1` on strict-mode drift. |
+| `replay(trace_id, db_path, *, mode)` | Returns `ReplayReport`. `exit_code=0` on pass; `exit_code=1` on strict-mode drift or unknown trace. |
 | `ReplayEngine.replay(trace_id, *, mode)` | Class form; one per replay run. |
-| `mode="strict"` | Every `ToolCall` must hash-equal the recorded call. Drift raises `ToolCallDriftError`. |
-| `mode="tolerant"` | Stub recorded results regardless of arg drift. |
+| `mode="strict"` | Every recorded `ToolCall` must hash-equal its canonicalized args. Drift raises `ToolCallDriftError`. |
+| `mode="tolerant"` | Records drift in the report but does not raise. |
 
 **Hash semantics:** `args_hash = sha256(canonical_json(args))` where canonical JSON is `sort_keys=True, separators=(",", ":"), ensure_ascii=False`. Two semantically-identical tool calls always hash equal.
+
+**Important honesty constraint:** the shipped replay engine is structural, not adapter-driven. It validates recorded tool-call hashes, counts drift, and returns the trace's recorded `final_answer` byte-for-byte. It does not re-run the adapter loop with stubbed tool outputs.
 
 ---
 
@@ -278,9 +280,8 @@ class ClaimVerdict:
 ```
 
 `agentsla/verify/gate.py` does the manual mapping — but is never called by the bench. So:
-- **No `Verdict` event is ever persisted** by the bench.
-- The trace store contains ToolCall/ToolResult/ModelMessage but **never** a Verdict.
-- Replay cannot re-run the verifier (no verdict in the log to compare against).
+- This was the pre-v0.2 failure mode. It is closed in the shipped code: wrapped bench runs now persist `Verdict` events.
+- Replay still does not re-run the verifier or adapter loop; it validates the stored trace structurally.
 
 ### 2.2 Solution
 
@@ -289,9 +290,9 @@ class ClaimVerdict:
 - **Option A (chosen):** Rename the dataclass to `InternalClaimVerdict`; keep `events.py:ClaimVerdict` as the canonical event shape. The `VerificationGate` maps internal→event when emitting to the trace store.
 - **Option B:** Collapse to one pydantic model. Higher churn — every verifier signature changes.
 
-**Step 2.** Wire `VerificationGate.run` into `bench/harness.py:WrappedHooks.on_final_answer`. The gate emits a `Verdict` event to the `TraceWriter`.
+**Step 2.** Wire `VerificationGate.run` into `bench/harness.py:WrappedHooks.on_final_answer`. The gate emits a `Verdict` event to the `TraceWriter`. Shipped.
 
-**Step 3.** Update `VerificationGate.run(trace: Trace, final_answer: str)` signature to match `VerificationChain.run(trace, final_answer)`. The gate's job is to take a `Trace`, run the chain, build the event, append to writer.
+**Step 3.** Update `VerificationGate.run(trace: Trace, final_answer: str)` signature to match `VerificationChain.run(trace, final_answer)`. The gate's job is to take a `Trace`, run the chain, build the event, append to writer. Shipped.
 
 ### 2.3 Test-first contract
 
@@ -379,7 +380,7 @@ Total: ~20 file edits, 9 atomic commits.
 | Invariant | How preserved |
 |---|---|
 | Append-only event log | `TraceWriter.append` is the only mutation path. No UPDATE/DELETE in any code path. |
-| Deterministic replay | `args_hash` is writer-computed from canonical JSON. Schema drift detection is the gate. |
+| Structural replay | `args_hash` is writer-computed from canonical JSON; replay re-validates hashes and returns the stored answer (drift detection, not re-execution). |
 | Frozen policies | `extra="forbid", frozen=True` on Policy. Operators cannot mutate at runtime. |
 | Replay-safe bench | Hermetic EchoModel + JsonEchoTool. No network, no clock, no PRNG. |
 | Coverage as first-class metric | Every Verdict event has `coverage ∈ [0, 1]`. Operators set per-domain threshold. |

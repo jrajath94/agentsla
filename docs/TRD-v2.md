@@ -31,7 +31,7 @@ the gaps the v2 audit must close.*
 
 Adapters (3):    RawLoop | LangGraph | Claude Agent SDK
 Bench (hermetic + live): {naked, wrapped} × tasks × seeds → parquet
-Replay:           strict (event-equal) | tolerant (stub outputs)
+Replay (structural): strict (hash drift = fail) | tolerant (drift recorded)
 ```
 
 ---
@@ -63,9 +63,10 @@ We accept this — those internal calls are out of scope for the SLO contract.
 | `Verdict` | `verified, verifier, detail, coverage, corrected_answer?` | `agentsla/core/events.py` |
 | `FinalAnswer` | `answer, ts` | `agentsla/core/events.py` |
 
-**Append-only invariant:** events never mutate after write. Replay reconstructs
-state by replaying events in seq order. This is what makes `agentsla replay
-<trace_id>` deterministic.
+**Append-only invariant:** events never mutate after write. Replay reads
+events in seq order, re-derives each `ToolCall.args_hash` from the recorded
+args, and returns the stored final answer. Replay is *structural* — it
+validates the recorded log; it does not re-drive the adapter.
 
 ### 2.3 Replay semantics
 
@@ -75,12 +76,13 @@ def replay(trace_id: UUID, *, mode: Literal["strict", "tolerant"]) -> ReplayRepo
 
 | Mode | Behavior | Use case |
 |---|---|---|
-| `strict` | Any divergence in tool call (arg drift, missing call) = FAIL | regression test for an agent fix |
-| `tolerant` | Stub recorded tool RESULTS regardless of arg drift | debug a past failure with current args |
+| `strict` | Any `args_hash` drift on a recorded ToolCall = FAIL (`ToolCallDriftError`, exit 1) | regression test that the recorded log is replay-safe |
+| `tolerant` | Drift recorded in `ReplayReport.drift_details`; run does not fail | triage a drifted log — the diff list is the artifact |
 
-**Invariant:** replay always re-uses recorded tool RESULTS (i.e. same
-`JsonEchoTool` payload) so the model sees the same inputs. Only the args /
-call sequence may diverge.
+**Invariant:** replay never re-executes tools or the model. It re-validates
+recorded `args_hash` values and returns the trace's stored final answer
+byte-for-byte. Adapter-driven re-execution with stubbed tool results is not
+shipped (see `agentsla/core/replay.py` module docstring).
 
 ---
 
@@ -161,7 +163,7 @@ call sequence may diverge.
 | Bypass via free-text response | model final answer | `bench/real_llm.py` wraps response in synthetic ToolCall → same gate enforces |
 | Policy bypass via arg mutation | same tool name, different args | `tool_rules[].json_schema` validates per-tool args |
 | Replay tamper | trace file edits | event log is append-only + UUID-keyed; replay reads from immutable DuckDB |
-| Model version drift on replay | different model, different output | schema_version stamped; replay fails if model_id mismatches unless `tolerant` |
+| Model version drift on replay | different model, different output | not applicable to structural replay (no model is invoked); live-bench rows carry `model_id` so provenance is auditable |
 | Prometheus LAN exposure | `--metrics-port` exposed | `--metrics-addr` defaults to `127.0.0.1`; opt-in required for `0.0.0.0` |
 
 ---

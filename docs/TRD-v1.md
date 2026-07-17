@@ -327,7 +327,7 @@ Each commit lands with: failing test first → minimal implementation → green 
 | Invariant | How preserved |
 |---|---|
 | Append-only event log | `TraceWriter.append` only mutation path. No UPDATE/DELETE in any code path. |
-| Deterministic replay | `args_hash` writer-computed from canonical JSON. Schema drift = gate. |
+| Structural replay | `args_hash` writer-computed from canonical JSON; replay re-validates hashes + returns stored answer (no re-execution). |
 | Frozen policies | `extra="forbid", frozen=True` on Policy. Runtime mutation raises. |
 | Replay-safe bench | Hermetic EchoModel + JsonEchoTool default. Real-LLM bench opt-in only. |
 | Coverage as first-class metric | Every Verdict event has `coverage ∈ [0, 1]`. |

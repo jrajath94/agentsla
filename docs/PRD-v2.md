@@ -87,7 +87,7 @@ Each signal gets its own acceptance test, traceable to a code path, an artifact,
 | ID | Requirement | Acceptance gate | Test file |
 |---|---|---|---|
 | F1 | Trace store appends events to DuckDB + Parquet | roundtrip preserves row count | `tests/unit/core/test_trace_store.py` |
-| F2 | Deterministic replay reproduces byte-identical final answer across N runs | 5/5 replays match | `tests/integration/test_cli_byte_identical.py` |
+| F2 | Structural replay returns the stored final answer byte-identically across N runs and re-validates every recorded `args_hash` | 5/5 replays match | `tests/integration/test_cli_byte_identical.py` |
 | F3 | **Honest gap** surfaced when no ground truth | banner includes env-var command | `tests/unit/bench/test_report.py:TestReportCli` |
 | F4 | Policy gate denies SSN/AWS-key/JWT egress on tool args | 20+ deny cases pass | `tests/unit/policy/test_gate.py` |
 | F5 | Three adapters emit equivalent event sequences | parity 100% agreement | `tests/integration/test_cross_adapter_parity.py` |

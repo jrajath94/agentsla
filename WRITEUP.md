@@ -43,9 +43,11 @@ The headline table (full per-domain in `bench/results/REPORT.md`):
 
 The honest reading: in this bench, **wrapping buys verification
 coverage AND injection resistance at no measurable p95 latency
-overhead.** The verifier recomputes every numeric claim in the final
-answer against the trace's tool results and emits a `Verdict` event
-with `coverage` and `per_claim` breakdown. The policy gate scans
+overhead.** The wrapped path emits a `Verdict` event with `coverage`
+and `per_claim` breakdown. On the hermetic bench, the default
+`NumericVerifier` uses an identity-source resolver, so the headline
+`gate_passed` number measures gate execution and claim coverage, not
+truth against an external tool result. The policy gate scans
 every tool-call argument value against the egress regex pack
 (default: real AWS keys, JWTs, SSN, Luhn-validated card PANs; plus
 a bench-only symbolic-AK rule for the 12-char injection marker) and
@@ -96,9 +98,10 @@ numbers. Regenerate with ``python -m agentsla.bench.figures
 --in bench/results/results.parquet --out-dir bench/results/figures``.
 
 **Hermetic EchoModel.** Real Claude / LangGraph adapters exist (Phase
-2), but the bench numbers come from in-process EchoModel. A live
-replay bench — recorded Claude API traces fed through the same
-harness — would produce a number with signal-to-noise. Phase 6 work.
+2), but the bench numbers come from in-process EchoModel. A bench
+fed by traces recorded from live Claude API calls (instead of the
+echo model) would produce a number with signal-to-noise. Phase 6
+work.
 
 ## What we tried, and why we changed it
 
@@ -117,8 +120,10 @@ ALLOW/DENY decision under each adapter.
 in-memory mutable trace object, but that breaks replay: a verifier
 that mutates the trace can't be re-run. The append-only log means
 the verifier appends a `Verdict` event instead of mutating the
-trace, and the replay engine reads the log and re-executes the
-recorded tool calls without re-running the verifier. The trace
+trace, and the replay engine reads the log to structurally replay the
+recorded tool calls by recomputing `args_hash` and surfacing drift.
+Today it returns the stored final answer rather than re-driving the
+adapter with stubbed tool results. The trace
 store is a DuckDB single `events` table with `(trace_id, seq)`
 ordering; the reader opens `read_only=True` so a running replay
 can't corrupt the live log.
@@ -228,9 +233,13 @@ flowchart LR
     CL --> LS[(JsonlLabelSink<br/>labels.jsonl)]
     CL --> PM[Prometheus counters]
 
-    TS --> RD[TraceReader<br/>deterministic replay]
-    RD -->|strict / tolerant| A1
+    TS --> RD[TraceReader<br/>structural replay]
+    RD --> RR[ReplayReport<br/>strict / tolerant]
 ```
+
+The replay reader does **not** drive the adapter. It validates
+recorded tool-call hashes against the canonical-JSON recomputation
+and returns the trace's stored final answer; see `agentsla/core/replay.py`.
 
 See [`docs/comparative-analysis.md`](docs/comparative-analysis.md)
 for the side-by-side framing against LangSmith / Langfuse / Helicone
@@ -238,7 +247,8 @@ for the side-by-side framing against LangSmith / Langfuse / Helicone
 
 1. **Real classifier eval.** The current 100% agreement is circular
    (synthetic traces from same triggers as the classifier). A live
-   Claude API replay would produce a number with signal.
+   classifier eval on traces recorded from real Claude API calls would
+   produce a number with signal.
 2. **Phase 3 RawLoopAdapter.run integration test.** The verifier
    unit-tests pass; the end-to-end drive through the adapter was
    dropped during Phase 3 implementation. Re-attempting now with
@@ -258,13 +268,23 @@ uv sync --extra all
 python -m pytest                       # 432 tests, ~12s
 python -m agentsla bench --seeds 5      # 350 rows → results.parquet
 python -m agentsla report --out bench/results/REPORT.md
-# Real-LLM bench (requires ANTHROPIC_API_KEY):
-ANTHROPIC_API_KEY=sk-... python -m agentsla bench-real --tasks-per-domain 3
+# Real-LLM bench (requires ANTHROPIC_API_KEY; PAID — preview with --dry-plan first).
+# Start with the 3-prompt smoke run; --max-paid-calls defaults to 3 and blocks
+# anything larger unless raised explicitly (see docs/GPU_API_COST_OPTIMIZATION.md):
+python -m agentsla bench-real --tasks-per-domain 1 --seeds 1 --dry-plan
+ANTHROPIC_API_KEY=sk-... python -m agentsla bench-real --tasks-per-domain 1 --seeds 1 \
+    --out bench/results/real_llm_smoke.parquet
 ```
 
 Every number in this writeup and in `README.md` is regenerated from
 the parquet by `agentsla report`. The contract is: re-running
 bench+report must produce a byte-identical table.
+
+Provenance of the live rows: the committed `bench/results/real_llm.parquet`
+was measured once (MiniMax-M3, 2026-07-13, 12 prompts / 24 rows). Report
+regeneration re-reads that parquet; it does not re-call the model. Live rows
+are refreshed only by an explicit `bench-real` run through the cost-guard
+ladder in `docs/GPU_API_COST_OPTIMIZATION.md`.
 
 ---
 
@@ -479,11 +499,10 @@ at scale, real LLM-judge agreement, cross-adapter parity under live
 network load) is v0.2 and beyond.
 
 The interesting next moves are the ones we deliberately left on
-the table: a live replay bench against recorded Claude API traces
-(instead of the echo model) to produce a number with real
+the table: a bench fed by traces recorded from live Claude API
+calls (instead of the echo model) to produce a number with real
 signal-to-noise, re-attempting the dropped Phase 3
 `RawLoopAdapter.run` integration test, and a cross-adapter parity
 bench that runs the same task under Claude SDK + LangGraph +
 rawloop and asserts byte-identical policy decisions. Each is a
 small, bounded change. None of them require redesigning the surface.
-

@@ -12,10 +12,10 @@ contract.
 The AgentSLA trace store is append-only. A `Verdict` event written
 to a DuckDB file in 2026-July is byte-identical to one written in
 2026-August unless we explicitly bump the schema. The append-only
-invariant is a *feature* — it makes deterministic replay possible —
-but it creates a versioning problem: when a new field lands in
-`core/events.py`, every existing DuckDB file becomes silently
-mis-typed.
+invariant is a *feature* — it makes structural replay (hash
+re-computation against the stored log) possible — but it creates a
+versioning problem: when a new field lands in `core/events.py`,
+every existing DuckDB file becomes silently mis-typed.
 
 The fix is to attach a `schema_version` field to every persisted
 `Trace` and to make the runtime refuse to mix versions in the same

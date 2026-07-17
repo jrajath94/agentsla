@@ -370,8 +370,9 @@ The shipped bench reports 100% agreement against this set. This is
 the ceiling of what the metric can express: the held-out set was
 constructed from the same triggers the classifier uses, which makes
 the eval circular (see `docs/failure-modes.md § 5` for the full
-discussion). A real eval would replay live Claude API traces through
-the harness — deferred to v0.2.
+discussion). A real eval would use traces recorded from live
+Claude API calls (recorded through the same `TraceWriter` path) —
+deferred to v0.2.
 
 ---
 
