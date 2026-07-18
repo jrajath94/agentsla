@@ -2,6 +2,61 @@
 
 All notable changes to AgentSLA are recorded here. Dates are UTC.
 
+## [v1.2.0] — 2026-07-17 — Minor: execution replay + budget wired into runtime hooks
+
+Closes the two remaining interview-critical gaps from the 2026-07-15
+workspace review: replay that actually re-drives the adapter loop, and
+a budget manager that is load-bearing in the runtime contract — plus a
+truth-boundary cleanup so no doc claims a verifier that does not exist.
+
+### Added
+
+- **Execution replay** (`agentsla/adapters/replay_exec.py`,
+  `agentsla replay TRACE_ID --execute`): re-drives the RawLoopAdapter
+  with every tool stubbed to serve its recorded result (FIFO per tool,
+  matched by `call_id`; recorded errors re-raise so the error path is
+  exercised) and asserts the re-produced final answer is
+  **byte-identical** to the recorded one, plus `args_hash` parity on
+  every re-executed tool call. Exit codes: 0 identical, 1 diverged,
+  2 not replayable.
+  - Scope stated precisely: deterministic-model (rawloop-recorded)
+    traces only. Live-model traces (Claude SDK / LangGraph against a
+    real endpoint) are refused with exit 2 — their model messages would
+    also need stubbing; pretending otherwise would fabricate a
+    determinism guarantee. Structural replay remains available for
+    every trace.
+  - Hard E2E test: record a real tool-loop run, re-execute from the
+    store, byte-identical; tampered-answer divergence and live-model
+    refusal pinned too (17 cases).
+- **`BudgetedHooks`** (`agentsla/adapters/budget_hooks.py`): wires
+  `BudgetManager` into the `RuntimeHooks` contract. Decision order:
+  inner policy DENY wins (and is not budget-charged); a budget breach
+  converts to a policy-style DENY so the adapter degrades to its
+  short-circuit answer instead of crashing; a post-execution breach
+  (tokens/cost via the optional `cost_model` estimator) degrades the
+  next call. Observable surface: `.breaches`, `.denied_calls`,
+  `.level(trace_id)`. Integration test proves graceful degradation
+  end-to-end through the real adapter loop (10 cases).
+
+### Changed
+
+- **Truth-boundary cleanup**: WRITEUP architecture diagram, TRD § 1.5,
+  `verify/gate.py` + `verify/__init__.py` docstrings, and the
+  `events.py` ClaimVerdict comment no longer read as if Grounding /
+  Schema verifiers exist. NumericVerifier is the one shipped verifier;
+  the chain accepts any Verifier implementation.
+- README (overview, Key Components, Limitations), WRITEUP replay
+  section, PRD.md (F5, F12, honesty row 10), and
+  comparative-analysis.md updated for the two-primitive replay story.
+  PRD-v1 untouched (versioned historical snapshot).
+
+### Source of truth
+
+- Implementation: `agentsla/adapters/replay_exec.py`,
+  `agentsla/adapters/budget_hooks.py`, `agentsla/cli/replay.py`.
+- Tests: `tests/unit/adapters/test_replay_exec.py`,
+  `tests/unit/adapters/test_budget_hooks.py` (574 total, was 557).
+
 ## [v1.1.0] — 2026-07-17 — Minor: bench-real cost guards + structural-replay honesty pass
 
 `bench-real` is the repo's only paid path. Before this release a
