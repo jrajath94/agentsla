@@ -1,9 +1,12 @@
 """Structural replay engine (TRACE-04, TRACE-05).
 
-This module ships a *structural* replay primitive, not an adapter-driven
-one. It validates that a recorded trace is self-consistent and returns
-the trace's stored final answer; it does not re-drive the adapter loop
-with stubbed tool outputs.
+This module ships the *structural* replay primitive. It validates that a
+recorded trace is self-consistent and returns the trace's stored final
+answer; it does not re-drive the adapter loop. The adapter-driven
+counterpart — re-execution with recorded tool results stubbed in,
+byte-identical final-answer check — lives in
+:mod:`agentsla.adapters.replay_exec` (``agentsla replay --execute``) and
+covers deterministic (rawloop-recorded) traces.
 
 Two modes:
 
@@ -21,13 +24,12 @@ For every ``ToolCall`` event in the trace, the engine re-derives
 ``args_hash`` from ``args`` (canonical JSON, ``sort_keys=True``) and
 compares it against the recorded ``args_hash``. Matches and drift are
 collected; the report's ``final_answer`` is the stored final answer
-byte-for-byte (always equal across replays by construction —
-adapter-driven re-execution with stubbed tool results is not shipped).
+byte-for-byte (always equal across replays by construction).
 
-Honesty constraint: this engine does *not* rerun the agent. A reviewer
-who wants adapter-driven replay must either install the replay hook
-themselves or treat this report as a hash-validation audit, not as
-re-execution evidence.
+Honesty constraint: this engine does *not* rerun the agent — use
+``agentsla replay --execute`` (:mod:`agentsla.adapters.replay_exec`)
+for re-execution evidence on deterministic traces; for live-model
+traces, treat this report as a hash-validation audit.
 
 Public surface (5 classes + 1 function):
 

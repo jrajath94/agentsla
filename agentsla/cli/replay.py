@@ -1,11 +1,19 @@
-"""CLI replay entrypoint — verifies a recorded trace's args match expectations.
+"""CLI replay entrypoint — structural replay by default, execution replay via --execute.
 
-Calls :func:`agentsla.core.replay.replay` against the database path and reports
-the result. Exit codes:
+Default (structural): calls :func:`agentsla.core.replay.replay` — recorded
+tool-call hash re-validation + the stored final answer.
 
-    0 — replay passed (strict or tolerant).
-    1 — strict-mode drift detected.
-    2 — trace id not found.
+``--execute`` (execution): calls
+:func:`agentsla.adapters.replay_exec.replay_execution` — re-drives the
+adapter loop with recorded tool results stubbed in and compares the
+re-produced final answer byte-for-byte. Only rawloop-recorded traces
+(deterministic model) are eligible; live-model traces exit 2.
+
+Exit codes (both modes):
+
+    0 — replay passed.
+    1 — divergence (structural drift, or execution-replay mismatch).
+    2 — trace id not found / trace not execution-replayable.
 """
 
 from __future__ import annotations
@@ -30,7 +38,16 @@ def main(argv: list[str] | None = None) -> int:
         "--mode",
         choices=[m.value for m in ReplayMode],
         default=ReplayMode.STRICT.value,
-        help="strict (raise on drift) or tolerant (ignore).",
+        help="strict (raise on drift) or tolerant (ignore). Structural mode only.",
+    )
+    parser.add_argument(
+        "--execute",
+        action="store_true",
+        help=(
+            "Execution replay: re-drive the adapter loop with recorded tool "
+            "results stubbed in; compare the final answer byte-for-byte. "
+            "Rawloop-recorded (deterministic-model) traces only."
+        ),
     )
     args = parser.parse_args(argv)
     if not args.db.exists():
@@ -38,6 +55,12 @@ def main(argv: list[str] | None = None) -> int:
         # read-only connection (DuckDB refuses read-only on non-existent files).
         print(json.dumps({"trace_id": args.trace_id, "found": False}, indent=2))
         return 2
+    if args.execute:
+        from agentsla.adapters.replay_exec import replay_execution
+
+        exec_report = replay_execution(args.trace_id, args.db)
+        print(json.dumps(exec_report.to_json_dict(), indent=2))
+        return exec_report.exit_code
     try:
         report = replay(args.trace_id, args.db, mode=ReplayMode(args.mode))
     except KeyError:

@@ -2,7 +2,7 @@
 
 Usage:
     python -m agentsla run [--db PATH] [--text TASK]
-    python -m agentsla replay TRACE_ID [--db PATH] [--mode strict|tolerant]
+    python -m agentsla replay TRACE_ID [--db PATH] [--mode strict|tolerant] [--execute]
     python -m agentsla bench [--all] [--seeds N] [--out PATH]
     python -m agentsla bench-seeded-errors [--strategies 0,10,50,100] [--trials N]
     python -m agentsla bench-real [--model M] [--tasks-per-domain N] [--out PATH]
