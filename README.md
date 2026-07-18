@@ -8,6 +8,11 @@
 
 SLO-aware reliability runtime for tool-calling LLM agents.
 
+**Verified 2026-07-18:** 574 tests pass locally on Python 3.12. The
+committed hermetic and real-LLM result tables below are derived from retained
+Parquet traces; the limitations section defines what those measurements do not
+establish.
+
 ## Overview
 
 AgentSLA wraps any tool-calling agent (Claude SDK, LangGraph, or custom) with a verification layer that enforces reliability contracts. It provides trace replay for debugging (structural for every trace; full execution replay for deterministic traces), budget enforcement wired into the runtime hooks, and per-category failure analysis.
