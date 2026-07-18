@@ -10,7 +10,7 @@ SLO-aware reliability runtime for tool-calling LLM agents.
 
 ## Overview
 
-AgentSLA wraps any tool-calling agent (Claude SDK, LangGraph, or custom) with a verification layer that enforces reliability contracts. It provides structural replay for debugging, budget enforcement, and per-category failure analysis.
+AgentSLA wraps any tool-calling agent (Claude SDK, LangGraph, or custom) with a verification layer that enforces reliability contracts. It provides trace replay for debugging (structural for every trace; full execution replay for deterministic traces), budget enforcement wired into the runtime hooks, and per-category failure analysis.
 
 ## Architecture
 
@@ -27,7 +27,8 @@ Request
 
 - **Policy**: Allowed tools, per-tool JSON Schema validation, regex-based secret screening (SSN, credit card, AWS key, JWT patterns)
 - **Verification**: Numeric recomputation today (extract claims → map to a source resolver → recompute)
-- **Trace Store**: Append-only event log (tool calls, results, model messages, verdicts) for structural replay and metrics
+- **Trace Store**: Append-only event log (tool calls, results, model messages, verdicts) for replay and metrics. `agentsla replay TRACE_ID` re-validates recorded tool-call hashes (structural); `agentsla replay TRACE_ID --execute` re-drives the adapter loop with recorded tool results stubbed in and asserts a byte-identical final answer (deterministic traces only)
+- **Budget**: `BudgetedHooks` wraps any inner hooks (e.g. the policy gate) and converts budget breaches (calls / tokens / cost / wall-time) into policy-style DENYs, so the agent degrades to a short-circuit answer instead of crashing
 - **Failure Classifier**: 14-category taxonomy with heuristics + optional LLM-based judgment
 - **Adapters**: Claude Agent SDK, LangGraph, and raw agent loops
 
@@ -243,7 +244,7 @@ Produces `success_rate.png`, `gate_passed.png`, `injection_resistance.png`, `lat
 ## Limitations
 
 - Verification handles numeric claims. Qualitative judgments (e.g., "sentiment is positive") require an external LLM check.
-- Replay is structural today: `agentsla replay` re-validates recorded tool-call hashes and returns the stored final answer. Adapter-driven re-execution with stubbed tool results is not shipped yet.
+- Execution replay (`agentsla replay --execute`) covers traces recorded with a deterministic model (the rawloop reference adapter). Traces recorded from live models (Claude SDK, LangGraph against a real endpoint) refuse execution replay with exit 2 — a live model's messages would also need stubbing — and fall back to structural replay (hash re-validation + stored answer).
 - Policy gate runs only on declared tool calls. If an agent generates code that makes external requests outside the declared tools, this layer cannot intercept.
 - Classifier uses `StubJudge` by default — the LLM-judge stage never runs in hermetic mode. Production deployments must instantiate `Classifier(judge=ClaudeJudge())` (haiku 4.5, `$ANTHROPIC_API_KEY` required) to exercise the full two-stage pipeline.
 - Prometheus counters are in-process. The shipped bench writes to the default registry but does NOT start a `/metrics` HTTP server unless `--metrics-port N` is passed. The Grafana dashboard JSON expects live series; locally, run `python -m agentsla bench --metrics-port 9090` and add a scrape target. For a long-running exporter independent of bench, `agentsla metrics serve --port N` starts an HTTP server against the process-global registry — the same `/metrics` endpoint Prometheus would scrape.

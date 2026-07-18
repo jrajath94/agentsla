@@ -35,7 +35,8 @@ class VerificationGate:
     """Run a :class:`VerificationChain` and emit a :class:`Verdict` event.
 
     Args:
-        chain: Composed verifier chain (numeric, grounding, schema, …).
+        chain: Composed verifier chain (NumericVerifier is the one
+            shipped verifier; the chain accepts any Verifier impl).
         writer: Open :class:`TraceWriter`. Caller owns lifecycle.
         verifier: Event-shape ``verifier`` tag (one of the literals).
     """
@@ -56,7 +57,7 @@ class VerificationGate:
 
         ``trace`` must expose ``.trace_id`` (UUID). The chain receives the
         full trace object so verifiers can inspect the event stream
-        (numeric recompute, grounding, schema checks). This signature
+        (numeric recompute today; future verifiers same shape). This signature
         matches :meth:`VerificationChain.run` — the gate is the typed
         boundary that turns a chain result into a persisted Verdict event.
         """

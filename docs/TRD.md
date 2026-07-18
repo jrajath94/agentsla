@@ -133,7 +133,10 @@ BudgetSpec(
 ### 1.5 Verification Gate (`agentsla/verify/*.py`)
 
 ```python
-VerificationChain(verifiers=[NumericVerifier(...), GroundingVerifier(...), SchemaVerifier(...)])
+# Shipped today: NumericVerifier only. The chain accepts any Verifier
+# implementation; GroundingVerifier / SchemaVerifier are design targets,
+# not shipped modules (see README § Limitations).
+VerificationChain(verifiers=[NumericVerifier(...)])
 chain.run(trace, final_answer) -> ChainResult
 ```
 

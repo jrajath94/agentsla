@@ -226,7 +226,7 @@ flowchart LR
     A2 -->|on_tool_result| TW[(TraceWriter<br/>DuckDB append-only)]
     TW -->|stored| TS[(TraceStore<br/>Parquet export)]
 
-    A3 -->|on_final_answer| VG[VerificationChain<br/>Numeric / Schema / Grounding]
+    A3 -->|on_final_answer| VG[VerificationChain<br/>Numeric today; chain is extensible]
     VG --> GR[VerificationGate]
     GR -->|emit Verdict| TW
     GR -->|result| CL[Classifier<br/>14 triggers + StubJudge]
@@ -235,11 +235,19 @@ flowchart LR
 
     TS --> RD[TraceReader<br/>structural replay]
     RD --> RR[ReplayReport<br/>strict / tolerant]
+    TS --> RX[replay --execute<br/>re-drive loop, stubbed tools]
+    RX --> XR[ExecutionReplayReport<br/>byte-identical check]
 ```
 
-The replay reader does **not** drive the adapter. It validates
-recorded tool-call hashes against the canonical-JSON recomputation
-and returns the trace's stored final answer; see `agentsla/core/replay.py`.
+Replay is two primitives. The structural reader validates recorded
+tool-call hashes against the canonical-JSON recomputation and returns
+the trace's stored final answer (`agentsla/core/replay.py`; every
+trace). Execution replay (`agentsla replay --execute`,
+`agentsla/adapters/replay_exec.py`) re-drives the adapter loop with
+each tool stubbed to serve its recorded result and asserts the
+re-produced final answer is byte-identical — scoped to deterministic
+(rawloop-recorded) traces; live-model traces refuse it rather than
+fabricate a determinism guarantee.
 
 See [`docs/comparative-analysis.md`](docs/comparative-analysis.md)
 for the side-by-side framing against LangSmith / Langfuse / Helicone

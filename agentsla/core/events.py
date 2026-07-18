@@ -241,8 +241,8 @@ class ClaimVerdict(_StrictModel):
     """Per-claim verification result.
 
     Defined here so :class:`Verdict.per_claim` has a stable shape from day one
-    (VERIFY-05: coverage as first-class metric). The Phase-3 numeric /
-    grounding / schema verifiers populate it; Phase-1 traces leave
+    (VERIFY-05: coverage as first-class metric). The numeric verifier
+    populates it (future verifiers reuse the shape); Phase-1 traces leave
     ``per_claim`` empty (``coverage == 1.0`` is the trivial-everything-checked
     sentinel).
     """

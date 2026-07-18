@@ -65,8 +65,9 @@ returning the stored final answer. The two modes:
 * **Tolerant** — drift is recorded but the replay continues so the
   report can be used for triage.
 
-Adapter-driven re-execution with stubbed tool results is planned but
-not shipped in the current replay engine.
+Adapter-driven re-execution with stubbed tool results ships as
+`agentsla replay --execute` for deterministic (rawloop-recorded)
+traces; live-model traces refuse it and fall back to structural replay.
 
 LangSmith/Langfuse ship "replay" as "re-run this trace in the UI to
 re-observe the same calls" — that is a debugging affordance, not a

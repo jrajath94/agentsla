@@ -1,7 +1,8 @@
 """Verification gate — post-execution claim recomputation.
 
-Phase 3 deliverable. Composes one or more verifiers (numeric, schema,
-grounding) into a single :class:`ChainResult` with a coverage metric.
+Phase 3 deliverable. Composes one or more verifiers into a single
+:class:`ChainResult` with a coverage metric. NumericVerifier is the one
+shipped verifier; the chain accepts any Verifier implementation.
 
 Per VERIFY-SPEC: only declarative numeric / structured claims
 count toward coverage. Opinions, qualitative facts, and uncited
