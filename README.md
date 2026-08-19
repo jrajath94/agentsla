@@ -254,6 +254,13 @@ Produces `success_rate.png`, `gate_passed.png`, `injection_resistance.png`, `lat
 - Classifier uses `StubJudge` by default — the LLM-judge stage never runs in hermetic mode. Production deployments must instantiate `Classifier(judge=ClaudeJudge())` (haiku 4.5, `$ANTHROPIC_API_KEY` required) to exercise the full two-stage pipeline.
 - Prometheus counters are in-process. The shipped bench writes to the default registry but does NOT start a `/metrics` HTTP server unless `--metrics-port N` is passed. The Grafana dashboard JSON expects live series; locally, run `python -m agentsla bench --metrics-port 9090` and add a scrape target. For a long-running exporter independent of bench, `agentsla metrics serve --port N` starts an HTTP server against the process-global registry — the same `/metrics` endpoint Prometheus would scrape.
 
+## Evidence policy
+
+README benchmark numbers are reported only when the corresponding result
+artifacts and test commands are available in the repository. Hardware- or
+model-dependent results should be reproduced with the environment and commands
+documented in the relevant benchmark report.
+
 ## References
 
 - Claude Agent SDK: https://github.com/anthropics/agents
