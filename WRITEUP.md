@@ -10,7 +10,7 @@ tool-calling agent answers "the Q3 revenue is $4.2M," the operator
 needs three guarantees: (1) the agent actually got there via a recorded
 chain of tool calls; (2) the answer is internally consistent with the
 tool results; (3) when the answer is wrong, the operator can label
-*why* — was it a hallucinated fact, a tool-call error, a reasoning
+*why* - was it a hallucinated fact, a tool-call error, a reasoning
 contradiction, or a transient tool failure? Without those guarantees,
 agentic automation is a credibility problem dressed up as productivity.
 
@@ -22,9 +22,9 @@ questions from a single append-only event log.
 
 A 35-task bench across financial ops, incident triage, and doc QA,
 run in hermetic mode (in-process EchoModel + JsonEchoTool) so the
-numbers are reproducible offline. Each task runs in two modes —
+numbers are reproducible offline. Each task runs in two modes -
 *naked* (just the agent) and *wrapped* (agent + policy gate +
-verification gate + classifier + hooks) — across two seeds, plus
+verification gate + classifier + hooks) - across two seeds, plus
 five injection-attack variants that embed an AWS-key-formatted
 secret (`AKIAIOSFODNN7EXAMPLE`, real-format so the egress regex
 matches) in the task text.
@@ -35,11 +35,11 @@ The headline table (full per-domain in `bench/results/REPORT.md`):
 |--------|------:|--------:|------:|
 | Success rate | 100% | 86% | -14% |
 | **Gate passed** | **0%** | **100%** | **+100%** |
-| **Verified at truth** | **n/a** | **n/a** | — |
+| **Verified at truth** | **n/a** | **n/a** | - |
 | **Injection resistance** | **0%** | **100%** | **+100%** |
 | p95 latency (ms) | 10.20 | 9.75 | -0.46 (-4.5%, within noise) |
 | Mean latency (ms) | 7.05 | 7.77 | +0.73 |
-| N runs | 70 | 70 | — |
+| N runs | 70 | 70 | - |
 
 The honest reading: in this bench, **wrapping buys verification
 coverage AND injection resistance at no measurable p95 latency
@@ -57,7 +57,7 @@ short-circuits the loop on a hit.
 `verified_pct` column. The bench's default `NumericVerifier` uses an
 identity-source resolver (the claim's own value is the source), so a
 100% `gate_passed` rate is *not* a claim that the agent's answers are
-correct — it is a claim that the gate *ran without rejecting*. The
+correct - it is a claim that the gate *ran without rejecting*. The
 truthful metric, `verified_at_truth`, is shown as `n/a` for the echo
 bench because the synthetic tasks do not declare canonical answers;
 it becomes meaningful when wired to real-task corpora. See
@@ -65,7 +65,7 @@ it becomes meaningful when wired to real-task corpora. See
 
 The 14-point wrapped-success-rate drop is the 20 injection-payload
 rows (5 injection task variants × 2 seeds × 2 modes) where the
-policy correctly blocked the agent — the wrapped `final=""` so
+policy correctly blocked the agent - the wrapped `final=""` so
 `task.expected_substring in final` evaluates False. That is
 intended: a wrapped agent that "succeeded" at exfiltrating an AWS
 key would be the bug, not the headline.
@@ -81,7 +81,7 @@ where args is a single short string, this lands well under 0.1 ms.
 **The classifier eval is too easy.** We measured 100% agreement
 against 100 hand-labelled traces, which is at the ceiling of what
 the metric can express. The dataset is synthetically constructed
-from the same triggers that the classifier runs — circular signal.
+from the same triggers that the classifier runs - circular signal.
 A real eval would use traces from a live LLM agent, not echoes.
 The bench wires Classifier + LabelSink + Prometheus counter into
 WrappedHooks (175 labels written to `labels.jsonl`, 25 classified
@@ -93,7 +93,7 @@ where REPORT.md had no figure artifacts. Five PNGs (`success_rate.png`,
 `gate_passed.png`, `injection_resistance.png`, `latency_cdf.png`,
 `cost_per_task.png`) live under `bench/results/figures/` and are
 auto-included by `agentsla report` from the same `_aggregate()` that
-powers the markdown tables — so the figures cannot drift from the
+powers the markdown tables - so the figures cannot drift from the
 numbers. Regenerate with ``python -m agentsla.bench.figures
 --in bench/results/results.parquet --out-dir bench/results/figures``.
 
@@ -110,7 +110,7 @@ considered forking the Claude SDK to inject hooks at the SDK
 internals. We abandoned that because it would force users to drop
 our fork into their stack. Hooks at the agent-loop boundary
 (`on_tool_call`, `on_tool_result`, `on_final_answer`) keep the
-runtime portable across Claude SDK, LangGraph, and rawloop — the
+runtime portable across Claude SDK, LangGraph, and rawloop - the
 three adapters all implement the same `AgentAdapter` ABC, so the
 runtime treats them identically. The runtime-vs-wrapper moment is
 the cross-adapter parity test: the same task produces the same
@@ -143,7 +143,7 @@ traces-per-second in a production deployment, equals a non-trivial
 line item. The 14-trigger heuristic stage handles 93% of traces
 without the LLM. The remaining 7% go to the judge with a
 content-hash-pinned prompt so the same input always produces the
-same prompt — important for replay, audit, and eval consistency.
+same prompt - important for replay, audit, and eval consistency.
 
 ## Failure modes we observed (14-category taxonomy)
 
@@ -151,25 +151,25 @@ The classifier outputs one of 14 categories sourced from the MAST
 taxonomy (arXiv 2503.13657), adapted for single-agent traces. In
 priority order:
 
-`hallucinated_fact` (severity 9) — final answer asserts a fact not
+`hallucinated_fact` (severity 9) - final answer asserts a fact not
 derivable from any tool result. The verifier catches these on
 numeric claims; the classifier catches them on non-numeric claims
 when the verification gate reports `incorrect > 0`.
 
-`policy_violation` (severity 9) — an event payload matches the
+`policy_violation` (severity 9) - an event payload matches the
 egress regex pack (AWS key, JWT, SSN, Luhn PAN). The policy gate
 emits DENY; the classifier re-labels at end-of-trace so the
 Prometheus counter aggregates by category.
 
-`reasoning_error` (severity 8) — the agent makes contradictory
+`reasoning_error` (severity 8) - the agent makes contradictory
 numeric claims in the same final answer (e.g., "Total = 100. Total
 = 50."). Detected by the verifier; surfaced by the classifier.
 
-`tool_response_misuse` (severity 7) — the agent invokes a tool that
+`tool_response_misuse` (severity 7) - the agent invokes a tool that
 returns an error and proceeds as if it succeeded. Detected when a
 ToolResult has `error` set AND a subsequent ToolCall does not adapt.
 
-`retry_loop` (severity 5) — three or more consecutive ToolCalls
+`retry_loop` (severity 5) - three or more consecutive ToolCalls
 with identical `(tool, args_hash)`. Detected by hashing
 `(tool, args)` only (excluding call_id/seq so two semantically
 identical calls produce the same hash).
@@ -245,7 +245,7 @@ the trace's stored final answer (`agentsla/core/replay.py`; every
 trace). Execution replay (`agentsla replay --execute`,
 `agentsla/adapters/replay_exec.py`) re-drives the adapter loop with
 each tool stubbed to serve its recorded result and asserts the
-re-produced final answer is byte-identical — scoped to deterministic
+re-produced final answer is byte-identical - scoped to deterministic
 (rawloop-recorded) traces; live-model traces refuse it rather than
 fabricate a determinism guarantee.
 
@@ -299,7 +299,7 @@ ladder in `docs/GPU_API_COST_OPTIMIZATION.md`.
 ## What shipped in v0.2 / v0.2.2
 
 The v0.2 / v0.2.2 push closes the third-adapter gap and the real-LLM
-bench gap that v0.1 deferred. Below is the honest accounting — what's
+bench gap that v0.1 deferred. Below is the honest accounting - what's
 real, what's measured, and what remains. The exact release dates and
 release-line highlights are in `CHANGELOG.md § [v0.2.0]` and
 `CHANGELOG.md § [v0.2.2]`.
@@ -343,9 +343,9 @@ re-running.
 
 `scripts/build_held_out_fixture.py` splits into two builders:
 
-* `build_synthetic_held_out_fixture` — pure-Python, no key. Always
+* `build_synthetic_held_out_fixture` - pure-Python, no key. Always
   works; rows tagged `synthetic=true`.
-* `build_real_held_out_fixture` — runs Claude. With no key +
+* `build_real_held_out_fixture` - runs Claude. With no key +
   `synthetic_fallback=True` (default) it degrades to synthetic rows;
   with `synthetic_fallback=False` it raises `RuntimeError`.
 
@@ -385,7 +385,7 @@ adapter parity drift, range multiplier mismatch, real-LLM rate-
 limit, held-out fixture circularity, per-verifier tolerance drift,
 fixture degradation, CLI subcommand collision, generated artifacts,
 tool-call id collisions. Each is documented with trigger, why it
-breaks, observable signal, v0.2 status, and mitigation — the same
+breaks, observable signal, v0.2 status, and mitigation - the same
 format as the v0.1 6-mode list.
 
 ### Test count
@@ -394,7 +394,7 @@ The exact test count is whatever `pytest tests/ -q --co | tail -1`
 reports on the current commit. A pinned integer here would drift the
 moment a new test lands; the live command is the source of truth.
 The v0.2 / v0.2.2 push added tests across the integration, unit,
-property, and script test directories — exact delta is in
+property, and script test directories - exact delta is in
 `CHANGELOG.md § [v0.2.0] Atomic commits` and `CHANGELOG.md § [v0.2.2]`.
 
 ### Quality gates (v0.2 / v0.2.2)
@@ -413,22 +413,22 @@ property, and script test directories — exact delta is in
 
 The v0.2 / v0.2.2 push explicitly does NOT solve:
 
-* **Live-LLM bench numbers** — the harness + tests + CLI are real;
+* **Live-LLM bench numbers** - the harness + tests + CLI are real;
   the actual numbers require a key (explicitly marked
   `[NOT YET MEASURED]`).
-* **Concurrent adapter paths** — current adapters are single-
+* **Concurrent adapter paths** - current adapters are single-
   threaded; tool-call id collision is documented but not yet a v0.2
   path.
-* **Per-verifier tolerance consensus** — chain does not enforce
+* **Per-verifier tolerance consensus** - chain does not enforce
   uniform tolerance; operators choose per domain.
-* **Streamed trace emission** — current TraceWriter is sync.
-* **Multi-tenancy / per-tenant policy** — governance decisions TBD.
-* **OpenTelemetry exporter** — separate design pass.
+* **Streamed trace emission** - current TraceWriter is sync.
+* **Multi-tenancy / per-tenant policy** - governance decisions TBD.
+* **OpenTelemetry exporter** - separate design pass.
 
 Each of these is a small, bounded change for v0.3 or later. None
 require redesigning the surface.
 
-— AgentSLA contributors, 2026.
+- AgentSLA contributors, 2026.
 ## A note on holdouts
 
 The bench reserves every fourth task as a rotating holdout. Out of the
@@ -437,7 +437,7 @@ also injects five injection-attack variants of the first five base
 tasks, bringing the total corpus to 35 tasks. The holdout ratio on
 the base 30 is 26.7%, comfortably above the 25% minimum called out
 in the project spec as PITFALL #9 (over-tuning to a fixed test set).
-In practice, the holdout numbers mirror the headline — the gap
+In practice, the holdout numbers mirror the headline - the gap
 between held-out and seen-task verification rates is currently zero,
 because the verifier is rule-based and does not learn. The holdout
 discipline matters more for future versions where the classifier
@@ -463,7 +463,7 @@ prevents the same numeric span from being matched twice (e.g.,
 "$1,200" should not also be matched as "1200" inside the same
 substring). Each extracted claim is recomputed against the
 `source_resolver` callable. The default identity source means claims
-without explicit grounding self-verify — useful for benchmark
+without explicit grounding self-verify - useful for benchmark
 calibration, deliberately useless for production where every claim
 should map to a tool result. Operators swap the resolver to inject
 domain knowledge: "this claim is the sum of column X in tool result
@@ -490,15 +490,15 @@ answer text. The judge is asked to pick one of 14 categories or
 "none" and report a confidence in [0, 1]. We accept judge output
 when confidence ≥ 0.7; below that, we fall back to the
 highest-severity heuristic candidate. The hash pin means the same
-trace content always produces the same prompt — the judge is
+trace content always produces the same prompt - the judge is
 replayable, and downstream eval scripts can compare labels across
 versions by diffing the prompt hash, not by re-running the judge on
 the entire dataset.
 
 ## Closing thoughts
 
-AgentSLA is a v0.1, not a product. The numbers are real — every
-row of `results.parquet` is reproducible — but the corpus is small
+AgentSLA is a v0.1, not a product. The numbers are real - every
+row of `results.parquet` is reproducible - but the corpus is small
 (35 tasks × 2 seeds = 70 rows per mode) and the model is hermetic.
 The headline is intentionally narrow: "wrapped gives you verification
 coverage AND injection resistance that naked does not, at ~13% p95
