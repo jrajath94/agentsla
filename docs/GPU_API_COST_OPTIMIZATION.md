@@ -105,18 +105,18 @@ LLM judge evaluation should be sampled:
 The classifier quality claim should come from targeted adjudication, not from
 paying for a judge on every easy trace.
 
-## Required Code/Doc Changes — Status
+## Required Code/Doc Changes - Status
 
-1. `--limit-task-ids` or equivalent to target only uncertain tasks — **not yet
+1. `--limit-task-ids` or equivalent to target only uncertain tasks - **not yet
    implemented** (optional follow-on; stratified per-domain selection is in).
-2. Persistent response cache for `_call_claude` — **implemented**
+2. Persistent response cache for `_call_claude` - **implemented**
    (`--cache-dir`, default `bench/cache/real_llm`, keyed by
    `sha256(model_id, task_id, prompt, seed)`; `--resume` reads it).
-3. `--dry-plan` mode printing estimated live calls before running —
+3. `--dry-plan` mode printing estimated live calls before running -
    **implemented** (zero network, no API key required).
 4. README live-bench instructions recommend the ladder (smoke → standard →
-   full) — **done** (README § Live bench cost guards).
-5. Tests proving cache hits do not invoke the client — **done**
+   full) - **done** (README § Live bench cost guards).
+5. Tests proving cache hits do not invoke the client - **done**
    (`tests/unit/bench/test_real_llm.py::TestResponseCache`).
 
 ## Stop Gates
@@ -271,7 +271,7 @@ python -m agentsla bench-real \
   --out bench/results/real_llm_standard.parquet
 ```
 
-The cap must be raised explicitly — the default (3) refuses this run.
+The cap must be raised explicitly - the default (3) refuses this run.
 
 Expected calls: 9 prompts, 18 rows.
 
@@ -294,15 +294,15 @@ python -m agentsla bench-real \
   --out bench/results/real_llm.parquet
 ```
 
-Expected calls: 15 prompts, 30 rows (12 ground-truthable tasks exist today —
-4 per domain — so `--tasks-per-domain 5` currently selects 12 tasks /
+Expected calls: 15 prompts, 30 rows (12 ground-truthable tasks exist today -
+4 per domain - so `--tasks-per-domain 5` currently selects 12 tasks /
 12 prompts / 24 rows until the corpus grows). `--overwrite` is required
 because `bench/results/real_llm.parquet` already holds the prior artifact.
 
 Hard cap: one run. If it rate-limits or partially fails, keep the honest rows
 and stop. Do not rerun blindly.
 
-## Implementation Hooks — Shipped
+## Implementation Hooks - Shipped
 
 All five hooks are implemented in `agentsla/bench/real_llm.py`:
 
