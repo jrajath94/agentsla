@@ -1,15 +1,15 @@
-# AgentSLA — Execution Plan (Target State, No Stages)
+# AgentSLA - Execution Plan (Target State, No Stages)
 
-**STATUS: HISTORICAL — all 12 DoD items shipped at v0.2 close (see CHANGELOG `[v0.2.0]`/`[v0.2.2]`).** Retained as the trajectory record for the v0.1→v0.2 push and as interview-prep context. For active execution plans going forward, see `docs/PRD-v1.md` (Claude SDK + Real-LLM bench push) + `docs/TRD-v1.md`.
+**STATUS: HISTORICAL - all 12 DoD items shipped at v0.2 close (see CHANGELOG `[v0.2.0]`/`[v0.2.2]`).** Retained as the trajectory record for the v0.1→v0.2 push and as interview-prep context. For active execution plans going forward, see `docs/PRD-v1.md` (Claude SDK + Real-LLM bench push) + `docs/TRD-v1.md`.
 
-**Purpose:** one document. Tells the implementing engineer (human or AI) exactly what ships and when to stop. No v0.1 / v0.2 / v0.3 phases — every item below is the **target state** for this push. Anything not on this list is out of scope.
+**Purpose:** one document. Tells the implementing engineer (human or AI) exactly what ships and when to stop. No v0.1 / v0.2 / v0.3 phases - every item below is the **target state** for this push. Anything not on this list is out of scope.
 
 **Read after:** none. This is the source of truth for execution.
 **Supersedes:** `docs/PRD.md`, `docs/TRD.md` (kept for interview-prep context; this file drives code).
 
 ---
 
-## 1. The Definition of Done — stop when ALL of these are true
+## 1. The Definition of Done - stop when ALL of these are true
 
 1. **`bench/harness.py` writes a `Verdict` event to DuckDB** for every wrapped run. `TraceReader.iter_events(trace_id)` returns ≥1 `Verdict` per wrapped trace. Verified by an integration test.
 2. **One `ClaimVerdict` type per layer.** Internal verify uses `InternalClaimVerdict` (dataclass); event emission uses `events.ClaimVerdict` (pydantic). No name collision. No silent mapping in dead code paths.
@@ -60,12 +60,12 @@ Each commit is one logical unit. Each is independently revertable. Each passes a
 
 ### Commit 3: `fix(gate): align VerificationGate.run signature with VerificationChain.run`
 - Files: `agentsla/verify/gate.py`.
-- Tests: `tests/unit/verify/test_verification_gate.py` — `run(trace, final_answer)` returns `GateResult` with `verdict` and `chain` populated; `Verdict` event appended to writer.
+- Tests: `tests/unit/verify/test_verification_gate.py` - `run(trace, final_answer)` returns `GateResult` with `verdict` and `chain` populated; `Verdict` event appended to writer.
 - Acceptance: `mypy --strict agentsla/verify` passes. `pytest tests/unit/verify` green.
 
 ### Commit 4: `feat(bench): persist Verdict events to trace store`
 - Files: `agentsla/bench/harness.py`.
-- Tests: `tests/integration/test_verdict_persistence.py` — wrapped run produces ≥1 Verdict event; naked run produces 0.
+- Tests: `tests/integration/test_verdict_persistence.py` - wrapped run produces ≥1 Verdict event; naked run produces 0.
 - Acceptance: `pytest tests/integration` green. Manual check: bench parquet → DuckDB query → Verdict row exists.
 
 ### Commit 5: `refactor(classify): sharpen reasoning_error and tool_response_misuse heuristics`
@@ -75,7 +75,7 @@ Each commit is one logical unit. Each is independently revertable. Each passes a
 
 ### Commit 6: `feat(metrics): honest headline — gate_passed + verified_at_truth`
 - Files: `agentsla/bench/harness.py`, `agentsla/bench/report.py`, `README.md`, `WRITEUP.md`, `bench/results/REPORT.md`.
-- Tests: `tests/unit/bench/test_report.py` — new columns appear with correct schema.
+- Tests: `tests/unit/bench/test_report.py` - new columns appear with correct schema.
 - Acceptance: report regenerates with renamed columns. README headline no longer misleading.
 
 ### Commit 7: `ci: github actions workflow with integration gate`
@@ -100,7 +100,7 @@ Each commit is one logical unit. Each is independently revertable. Each passes a
 
 ---
 
-## 4. Out of scope (explicit non-goals — do NOT add to this push)
+## 4. Out of scope (explicit non-goals - do NOT add to this push)
 
 - Live-LLM bench against Claude API (cost + non-determinism; deferred).
 - OTel exporter (Prometheus covers the on-call needs).
@@ -117,14 +117,14 @@ Each commit is one logical unit. Each is independently revertable. Each passes a
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
-| Schema rename breaks 332 tests | High | TDD per commit; never modify tests to match code — fix code. |
+| Schema rename breaks 332 tests | High | TDD per commit; never modify tests to match code - fix code. |
 | Verdict event doubles trace size | Low | Parquet compresses; bench adds ~1% to row size. |
 | CI integration gate is too strict | Low | Gate checks import lines only, not implementation details. |
 | `verified_pct` rename breaks downstream consumers | Low | README is the only consumer; this repo is v0.1 hardening. |
 
 ---
 
-## 6. Verification — how to know we're done
+## 6. Verification - how to know we're done
 
 ```bash
 # 1. All tests pass + integration tests pass + coverage holds
