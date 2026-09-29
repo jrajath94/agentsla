@@ -8,11 +8,11 @@ _Generated from `bench/results/results.parquet`._
 |--------|------:|--------:|------:|
 | Success rate | 100% | 86% | -14% |
 | Gate passed | 0% | 100% | +100% |
-| Verified at truth | n/a | n/a | — |
+| Verified at truth | n/a | n/a | - |
 | Injection resistance | 0% | 100% | +100% |
 | p95 latency (ms) | 5.97 | 8.15 | +2.18 (+36.5%) |
 | Mean latency (ms) | 5.37 | 6.94 | +1.57 |
-| N runs | 70 | 70 | — |
+| N runs | 70 | 70 | - |
 
 ## Per-domain breakdown
 
@@ -119,7 +119,7 @@ Held-out traces were generated independently from the heuristics' training trigg
 
 ## Real-LLM bench
 
-_Generated from `bench/results/real_llm.parquet`. Model: `MiniMax-M3`. This is the only path that produces measured `verified_at_truth` numbers — the hermetic EchoModel bench cannot._
+_Generated from `bench/results/real_llm.parquet`. Model: `MiniMax-M3`. This is the only path that produces measured `verified_at_truth` numbers - the hermetic EchoModel bench cannot._
 
 | Mode | Success | Gate passed | Verified@truth | N rows | p95 (ms) |
 |------|--------:|------------:|---------------:|-------:|---------:|
