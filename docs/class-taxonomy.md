@@ -1,8 +1,8 @@
-# CLASS-TAXONOMY — 14-Category Failure Taxonomy
+# CLASS-TAXONOMY - 14-Category Failure Taxonomy
 
 **Status:** Phase 4 hard gate. Committed before any `agentsla/classify/*.py` import.
-**Derived from:** MAST taxonomy, arXiv 2503.13657 (Robey et al., 2026) — multi-agent system
-failure categorisation — adapted for single-agent tool-calling traces.
+**Derived from:** MAST taxonomy, arXiv 2503.13657 (Robey et al., 2026) - multi-agent system
+failure categorisation - adapted for single-agent tool-calling traces.
 **Last updated:** 2026-07-09
 
 ---
@@ -22,7 +22,7 @@ occurrence in the `(trace_id, seq)` ordering.
 
 The taxonomy is intentionally narrow: 14 categories, machine-checkable
 heuristic triggers, one fallback path to an LLM judge. We do not
-attempt automatic category discovery — operators want stable labels
+attempt automatic category discovery - operators want stable labels
 they can build alerts on, not emergent cluster IDs.
 
 ---
@@ -33,7 +33,7 @@ Each row: `{category, definition, example, severity}`.
 
 | #  | Category                  | Definition                                                                                | Example                                                                    | Severity            |
 |----|---------------------------|-------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|---------------------|
-| 1  | `format_violation`        | Final answer fails its declared JSON schema / structured-output contract                  | `expected: {"answer": str}`, agent returns prose                            | 4 (low — recoverable) |
+| 1  | `format_violation`        | Final answer fails its declared JSON schema / structured-output contract                  | `expected: {"answer": str}`, agent returns prose                            | 4 (low - recoverable) |
 | 2  | `tool_call_error`         | Agent invokes a tool with wrong name, missing required arg, or wrong type                 | `tool="search"` but policy only allows `fetch`                              | 6                   |
 | 3  | `tool_response_misuse`    | Agent invokes tool correctly but misinterprets the result (treats error as success)        | `{"error": "not_found"}` parsed as `{}` and used downstream                 | 7                   |
 | 4  | `hallucinated_fact`       | Final answer asserts a fact not derivable from any tool result in the trace                | `Total = 4,500` when no tool returned 4,500                                 | 9                   |
@@ -99,7 +99,7 @@ present only on the error schema (e.g. `error_code`, `error_message`)
 as if they were data fields.
 
 **False-positive risk:** An agent that calls a different tool after
-the error — the heuristic looks at the immediately next call. If the
+the error - the heuristic looks at the immediately next call. If the
 agent chains through a successful tool call before retrying, the
 trigger does not fire.
 
@@ -181,7 +181,7 @@ emit a partial Verdict before the trace exceeds the window.
 **Observable signals:** `agentsla_budget_exhaustion_total{axis=...}`
 counter increments (`axis` ∈ {tokens, cost_usd, latency_s}).
 
-**False-positive risk:** rare — the BudgetManager emits the event
+**False-positive risk:** rare - the BudgetManager emits the event
 only on configured threshold crossing.
 
 **Mitigation:** raise the operator's threshold for cost-sensitive
@@ -213,7 +213,7 @@ adjust its plan rather than retry.
 identical hashes; the agent is not making progress.
 
 **False-positive risk:** idempotent read calls (e.g. `get_status`
-polls) — operators should mark these idempotent in `policy.yaml` so
+polls) - operators should mark these idempotent in `policy.yaml` so
 the heuristic skips them.
 
 **Mitigation:** surface the loop to the agent and require an
@@ -273,7 +273,7 @@ other category.
 **Observable signals:** an unclassified `ToolResult.error` event;
 the classifier falls back to this category as a catch-all.
 
-**False-positive risk:** low — this is the explicit catch-all
+**False-positive risk:** low - this is the explicit catch-all
 category. Operators should still triage: a high rate here means the
 upstream taxonomy is missing a category.
 
@@ -350,7 +350,7 @@ For traces where the heuristic stage returns low confidence OR no
 heuristic triggered AND the verification gate reports `incorrect > 0`,
 the classifier dispatches to an LLM judge (default model:
 `claude-haiku-4-5`, `temperature=0`). Prompt is **content-hash-pinned**
-so the same input always produces the same prompt — verifiable via
+so the same input always produces the same prompt - verifiable via
 `git log --follow classify/prompts/`.
 
 The judge returns `(category, confidence)`; we accept when
@@ -371,7 +371,7 @@ the ceiling of what the metric can express: the held-out set was
 constructed from the same triggers the classifier uses, which makes
 the eval circular (see `docs/failure-modes.md § 5` for the full
 discussion). A real eval would use traces recorded from live
-Claude API calls (recorded through the same `TraceWriter` path) —
+Claude API calls (recorded through the same `TraceWriter` path) -
 deferred to v0.2.
 
 ---
