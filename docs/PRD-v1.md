@@ -1,8 +1,8 @@
-# AgentSLA — Product Requirements Document (v1 — Claude SDK + Real-LLM bench)
+# AgentSLA - Product Requirements Document (v1 - Claude SDK + Real-LLM bench)
 
 **Author:** TDD-driven red/green execution
 **For:** Anthropic Staff SWE candidacy (Tier-1 project) · Hiring signals: scale-with-SLOs · tradeoff narratives · control-plane ownership · failure-mode literacy · verifiable artifacts
-**Supersedes:** `docs/PRD.md` (v0.1 hardening — closed); `docs/TRD.md` (v0.1 hardening — closed); `docs/EXECUTION.md` (all 12 DoD items shipped at v0.2 close).
+**Supersedes:** `docs/PRD.md` (v0.1 hardening - closed); `docs/TRD.md` (v0.1 hardening - closed); `docs/EXECUTION.md` (all 12 DoD items shipped at v0.2 close).
 **Date:** 2026-07-13
 
 ---
@@ -11,32 +11,32 @@
 
 AgentSLA is an **SLO-aware reliability runtime** that wraps any tool-calling LLM agent (Claude Agent SDK, LangGraph, raw loop) with **four hard guarantees**:
 
-1. **Policy enforcement** — every tool call passes a declarative YAML policy (allowed tools, JSON-Schema validation, per-tool/per-trace call caps, egress regex pack) before execution.
-2. **Post-generation verification** — every numeric claim in the final answer is recomputed against source tool results; the gate emits a `Verdict` event with `coverage` (fraction of claims checked) and `incorrect` count.
-3. **Structural replay** — every run is captured as an append-only event log; `agentsla replay <trace_id>` re-validates recorded tool-call hashes and returns the recorded final answer, converting trace drift into a reproducible audit signal. Adapter-driven re-execution with stubbed tool results is not shipped.
-4. **Failure attribution** — every failed trace is labeled with one of 14 categories via a two-stage classifier (heuristic → LLM judge) and emitted as a Prometheus counter.
+1. **Policy enforcement** - every tool call passes a declarative YAML policy (allowed tools, JSON-Schema validation, per-tool/per-trace call caps, egress regex pack) before execution.
+2. **Post-generation verification** - every numeric claim in the final answer is recomputed against source tool results; the gate emits a `Verdict` event with `coverage` (fraction of claims checked) and `incorrect` count.
+3. **Structural replay** - every run is captured as an append-only event log; `agentsla replay <trace_id>` re-validates recorded tool-call hashes and returns the recorded final answer, converting trace drift into a reproducible audit signal. Adapter-driven re-execution with stubbed tool results is not shipped.
+4. **Failure attribution** - every failed trace is labeled with one of 14 categories via a two-stage classifier (heuristic → LLM judge) and emitted as a Prometheus counter.
 
-It is the **reliability layer for agents** — the thing that turns "agent demoed well" into "agent runs in production with an SLA."
+It is the **reliability layer for agents** - the thing that turns "agent demoed well" into "agent runs in production with an SLA."
 
 ---
 
-## 1. Current state — what v0.2 left on the table
+## 1. Current state - what v0.2 left on the table
 
 | Capability | v0.2 status | Tier-1 ready? |
 |---|---|---|
 | 4 guarantees (policy / verify / replay / classifier) wired E2E | ✓ shipped | yes |
-| Cross-adapter parity bench (rawloop vs langgraph, 30 paired runs) | ✓ shipped | partial — Claude SDK absent |
-| Held-out classifier eval (36 synthetic traces, 100% agreement) | ✓ shipped | **no** — fixture is synthetic, eval is circular |
+| Cross-adapter parity bench (rawloop vs langgraph, 30 paired runs) | ✓ shipped | partial - Claude SDK absent |
+| Held-out classifier eval (36 synthetic traces, 100% agreement) | ✓ shipped | **no** - fixture is synthetic, eval is circular |
 | Honest headline (`gate_passed`, `verified_at_truth`) | ✓ shipped | yes |
 | 5 matplotlib figures + REPORT.md | ✓ shipped | yes |
 | CI integration gate (grep PolicyGate + Classifier + sink + metrics) | ✓ shipped | yes |
-| Failure-modes postmortem (6 modes) | ✓ shipped | partial — coverage gaps |
-| Per-verifier tolerance config | ✗ 1e-2 hardcoded | no — finops wants 1e-6, doc-qa wants 1e-2 |
+| Failure-modes postmortem (6 modes) | ✓ shipped | partial - coverage gaps |
+| Per-verifier tolerance config | ✗ 1e-2 hardcoded | no - finops wants 1e-6, doc-qa wants 1e-2 |
 | Range claims with per-endpoint multipliers (`$4.2M–$4.5M`) | ✗ dropped silently | no |
-| README quickstart imports nonexistent symbols | ✗ `PolicyConfig` / `VerificationGate` / `agentsla.trace` | **NO — interview footgun** |
-| Claude Agent SDK adapter | ✗ not shipped | **NO — spec says "runtime not wrapper"** |
-| Real-LLM bench (Claude Haiku runs) | ✗ deferred | **NO — EchoModel self-certifies** |
-| Real labeled traces for classifier eval | ✗ fixture is synthetic | **NO — circular eval** |
+| README quickstart imports nonexistent symbols | ✗ `PolicyConfig` / `VerificationGate` / `agentsla.trace` | **NO - interview footgun** |
+| Claude Agent SDK adapter | ✗ not shipped | **NO - spec says "runtime not wrapper"** |
+| Real-LLM bench (Claude Haiku runs) | ✗ deferred | **NO - EchoModel self-certifies** |
+| Real labeled traces for classifier eval | ✗ fixture is synthetic | **NO - circular eval** |
 | WRITEUP reflects v0.2 numbers | ✗ stale | partial |
 
 **v1 mandate:** close every Tier-1 gap. Land everything in one atomic release. Push to `origin/main`.
@@ -45,7 +45,7 @@ It is the **reliability layer for agents** — the thing that turns "agent demoe
 
 ## 2. v1 Functional Requirements
 
-### 2.1 MUST — Tier-1 critical (interview-blocking)
+### 2.1 MUST - Tier-1 critical (interview-blocking)
 
 #### F1. README quickstart is runnable end-to-end (CRITICAL)
 
@@ -66,8 +66,8 @@ Spec (`Staff_Level_Projects_Spec_July2026.md` § Project 1) explicitly states Ag
 
 **Acceptance:**
 - New file: `agentsla/adapters/claude_sdk.py` (≥150 LOC, ≤400 LOC)
-- New test: `tests/unit/adapters/test_claude_sdk.py` — mock SDK client, assert parity with `rawloop` adapter on shared fixture task
-- New integration test: `tests/integration/test_claude_sdk_parity.py` — same 5 demo tasks run through both adapters, assert event-kind sequence equality
+- New test: `tests/unit/adapters/test_claude_sdk.py` - mock SDK client, assert parity with `rawloop` adapter on shared fixture task
+- New integration test: `tests/integration/test_claude_sdk_parity.py` - same 5 demo tasks run through both adapters, assert event-kind sequence equality
 - `agentsla/adapters/__init__.py` exports `ClaudeSdkAdapter`
 - Parity bench includes Claude SDK column (4-row parity table: rawloop × langgraph × claude_sdk × dev/null)
 
@@ -77,14 +77,14 @@ Spec (`Staff_Level_Projects_Spec_July2026.md` § Project 1) explicitly states Ag
 
 The hermetic `EchoModel` self-certifies: any task that contains a numeric token gets echoed back as the "final answer," so `gate_passed=100%` for wrapped mode and `verified=100%` are **structural**, not empirical. A reviewer reads the headline and asks: "Does this work on a real agent?" v1 must answer yes, with measured numbers.
 
-**Requirement:** add a `bench/real_llm.py` harness that runs the same 30 tasks through a real Claude API call (model: `claude-haiku-4-5-20251001` — cheapest, deterministic-enough), captures traces to the same DuckDB schema, runs the verification gate against the real outputs, and reports sensitivity + specificity + overhead.
+**Requirement:** add a `bench/real_llm.py` harness that runs the same 30 tasks through a real Claude API call (model: `claude-haiku-4-5-20251001` - cheapest, deterministic-enough), captures traces to the same DuckDB schema, runs the verification gate against the real outputs, and reports sensitivity + specificity + overhead.
 
 **Acceptance:**
 - New file: `bench/real_llm.py` (≤250 LOC)
 - CLI: `python -m agentsla bench-real --model claude-haiku-4-5-20251001 --tasks-per-domain 5 --out bench/results/real_llm.parquet`
 - Requires `ANTHROPIC_API_KEY` env var; fails fast with clear message if absent
-- New test: `tests/unit/bench/test_real_llm.py` — mock API, assert schema, assert gate integration
-- New integration test: `tests/integration/test_real_llm_smoke.py` — 1 task × 1 seed against mock, asserts parquet rows + REPORT.md section
+- New test: `tests/unit/bench/test_real_llm.py` - mock API, assert schema, assert gate integration
+- New integration test: `tests/integration/test_real_llm_smoke.py` - 1 task × 1 seed against mock, asserts parquet rows + REPORT.md section
 - REPORT.md gets new "Real-LLM bench" section with sensitivity/specificity/overhead
 - CI runs the test with `ANTHROPIC_API_KEY=""` → skips (no live API in CI), but does run with mock
 
@@ -94,12 +94,12 @@ The hermetic `EchoModel` self-certifies: any task that contains a numeric token 
 
 Current held-out fixture (`tests/fixtures/held_out_labels.jsonl`, 36 traces) was generated by `scripts/build_held_out_fixture.py` from synthetic triggers. Agreement is 100% because the fixture mirrors the heuristic triggers. A reviewer reading "100% agreement" asks: "On real traces?" v1 must answer yes.
 
-**Requirement:** build a fixture generator that produces real Claude outputs on a held-out task set (excluded from heuristics), then hand-labels the categories. Replace `tests/fixtures/held_out_labels.jsonl` with the new fixture. The agreement number will drop (good — that proves the eval is honest).
+**Requirement:** build a fixture generator that produces real Claude outputs on a held-out task set (excluded from heuristics), then hand-labels the categories. Replace `tests/fixtures/held_out_labels.jsonl` with the new fixture. The agreement number will drop (good - that proves the eval is honest).
 
 **Acceptance:**
 - `scripts/build_held_out_fixture.py` extended to use Claude API; falls back to synthetic if no key
 - Fixture ≥100 real traces (or synthetic with explicit `[SYNTHETIC]` marker if no API)
-- New test: `tests/integration/test_held_out_eval.py` — runs classifier on fixture, asserts eval reports per-category accuracy
+- New test: `tests/integration/test_held_out_eval.py` - runs classifier on fixture, asserts eval reports per-category accuracy
 - Eval-classifier report transparently marks `[SYNTHETIC]` vs `[REAL]` rows
 - README headline cites the real number (or honest gap if not yet run)
 
@@ -120,7 +120,7 @@ Hardcoded `1e-2` in `verify/numeric.py` is wrong for finops (financial accuracy 
 **Acceptance:**
 - `NumericVerifier(tolerance=...)` constructor param honored end-to-end
 - `examples/policy.yaml` documents `verify.tolerance` (top-level knob) or per-tool override
-- Test: `test_numeric_tolerance_config.py` — verifier with `tolerance=1e-6` catches a `1e-4` perturbation; with `tolerance=1e-2` accepts it
+- Test: `test_numeric_tolerance_config.py` - verifier with `tolerance=1e-6` catches a `1e-4` perturbation; with `tolerance=1e-2` accepts it
 - README § "Tuning tolerance" explains the tradeoff
 
 #### F7. Range claims with per-endpoint multipliers (HIGH)
@@ -129,10 +129,10 @@ Hardcoded `1e-2` in `verify/numeric.py` is wrong for finops (financial accuracy 
 
 **Acceptance:**
 - `verify/claims.py` range regex matches per-endpoint multiplier pattern
-- Test: `test_range_claim_extraction.py` — positive fixture `$4.2M–$4.5M`, `$1,200-$1,800`, `€100-€200`; negative fixtures that previously parsed now parse correctly
+- Test: `test_range_claim_extraction.py` - positive fixture `$4.2M–$4.5M`, `$1,200-$1,800`, `€100-€200`; negative fixtures that previously parsed now parse correctly
 - Coverage metric rises for range-bearing tasks
 
-### 2.2 SHOULD — Tier-1 polish
+### 2.2 SHOULD - Tier-1 polish
 
 #### F8. failure-modes.md quality pass
 
@@ -144,14 +144,14 @@ v0.1-era doc, 6 modes listed. v1: every mode must have (a) concrete trigger, (b)
 
 #### F10. Bench integration tests
 
-Add `tests/integration/test_bench_smoke.py` — runs the full bench with `--seeds 1`, asserts parquet schema + REPORT.md sections present. Catches "bench silently produces empty report" regressions.
+Add `tests/integration/test_bench_smoke.py` - runs the full bench with `--seeds 1`, asserts parquet schema + REPORT.md sections present. Catches "bench silently produces empty report" regressions.
 
 ### 2.3 WON'T (out of scope for v1)
 
 - Multi-agent / swarm (deferred v2)
 - Hosted SaaS (deferred v2)
-- Live dashboards (deferred — Prometheus /metrics is the contract)
-- Async trace writer (deferred v2 — DuckDB single-writer is documented honest gap)
+- Live dashboards (deferred - Prometheus /metrics is the contract)
+- Async trace writer (deferred v2 - DuckDB single-writer is documented honest gap)
 - OTel exporter (deferred v2)
 - Migration story for tenant extensions (deferred v2)
 
@@ -174,7 +174,7 @@ Add `tests/integration/test_bench_smoke.py` — runs the full bench with `--seed
 ## 4. Acceptance criteria (v1 Definition of Done)
 
 1. ✓ All 394 existing tests pass + new tests for v1 (target: ≥420).
-2. ✓ `tests/integration/test_readme_quickstart.py` passes — README snippet imports cleanly.
+2. ✓ `tests/integration/test_readme_quickstart.py` passes - README snippet imports cleanly.
 3. ✓ `agentsla/adapters/claude_sdk.py` exists, exports `ClaudeSdkAdapter`, parity test green.
 4. ✓ `bench/real_llm.py` exists, CLI runs end-to-end, REPORT.md gets "Real-LLM bench" section.
 5. ✓ Held-out fixture ≥100 real traces (or honest `[SYNTHETIC]` marker if no API), eval-report marks origin.
@@ -192,9 +192,9 @@ Add `tests/integration/test_bench_smoke.py` — runs the full bench with `--seed
 
 | Signal | v1 evidence |
 |---|---|
-| **Scale with SLOs** | `bench/results/REPORT.md` — p95 latency overhead, gate_passed, verified_at_truth, per-domain, real-LLM section. Plus parity proof across 3 adapters. |
+| **Scale with SLOs** | `bench/results/REPORT.md` - p95 latency overhead, gate_passed, verified_at_truth, per-domain, real-LLM section. Plus parity proof across 3 adapters. |
 | **Tradeoff narratives** | WRITEUP § "What we tried" gets one new entry: hermetic EchoModel vs real Claude. v0.2 chose hermetic (reproducibility); v1 layers real on top (credibility). |
-| **Control-plane ownership** | RuntimeHooks wired through 3 adapters (rawloop + langgraph + claude_sdk) — the policy gate / verifier / classifier stay constant; only the agent loop changes. |
+| **Control-plane ownership** | RuntimeHooks wired through 3 adapters (rawloop + langgraph + claude_sdk) - the policy gate / verifier / classifier stay constant; only the agent loop changes. |
 | **Failure-mode literacy** | failure-modes.md ≥10 modes; each with concrete trigger + observable + mitigation. Plus real-LLM bench produces real failure categories. |
 | **Verifiable artifacts** | `make bench && make bench-real && make report` regenerates every number. One-command repro. CI integration gates prevent silent regressions. |
 
@@ -223,13 +223,13 @@ Add `tests/integration/test_bench_smoke.py` — runs the full bench with `--seed
 
 ## 8. Sequencing (commit order, atomic)
 
-1. **docs: PRD v1 + TRD v1** — no code changes
-2. **fix(docs): README quickstart truth** — fix imports, add integration test
-3. **feat(adapter): Claude SDK adapter** — TDD red → green → parity test
-4. **feat(verify): per-verifier tolerance config** — TDD
-5. **fix(verify): range claims per-endpoint multiplier** — TDD
-6. **feat(bench): real-LLM bench harness** — TDD
-7. **chore(classify): real held-out fixture generator** — extends existing script
-8. **docs: failure-modes.md quality pass** — ≥10 modes
-9. **docs: WRITEUP v1** — cite new numbers + mermaid
-10. **chore(release): v1 tag + CHANGELOG** — final
+1. **docs: PRD v1 + TRD v1** - no code changes
+2. **fix(docs): README quickstart truth** - fix imports, add integration test
+3. **feat(adapter): Claude SDK adapter** - TDD red → green → parity test
+4. **feat(verify): per-verifier tolerance config** - TDD
+5. **fix(verify): range claims per-endpoint multiplier** - TDD
+6. **feat(bench): real-LLM bench harness** - TDD
+7. **chore(classify): real held-out fixture generator** - extends existing script
+8. **docs: failure-modes.md quality pass** - ≥10 modes
+9. **docs: WRITEUP v1** - cite new numbers + mermaid
+10. **chore(release): v1 tag + CHANGELOG** - final
