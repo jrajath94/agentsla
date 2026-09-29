@@ -12,8 +12,8 @@ contract.
 The AgentSLA trace store is append-only. A `Verdict` event written
 to a DuckDB file in 2026-July is byte-identical to one written in
 2026-August unless we explicitly bump the schema. The append-only
-invariant is a *feature* — it makes structural replay (hash
-re-computation against the stored log) possible — but it creates a
+invariant is a *feature* - it makes structural replay (hash
+re-computation against the stored log) possible - but it creates a
 versioning problem: when a new field lands in `core/events.py`,
 every existing DuckDB file becomes silently mis-typed.
 
@@ -70,12 +70,12 @@ When a bump is needed:
    the test.
 6. **Tag the prior version.** `git tag schema-v1` on the commit
    that ships the v1→v2 converter. That tag is the *upgrader*'s
-   reference, not the *runtime*'s — runtime reads `SCHEMA_VERSION`
+   reference, not the *runtime*'s - runtime reads `SCHEMA_VERSION`
    directly.
 
 ## Worked example (v1 → v2)
 
-*Hypothetical — v2 has not shipped yet. This block exists as the
+*Hypothetical - v2 has not shipped yet. This block exists as the
 pattern future bump PRs will copy.*
 
 Suppose v2 adds a `caller_id: str | None = None` field to
@@ -148,12 +148,12 @@ will land alongside the first real v1→v2 converter.
 
 ## Cross-references
 
-- `agentsla/core/schema_version.py` — `SCHEMA_VERSION` constant,
+- `agentsla/core/schema_version.py` - `SCHEMA_VERSION` constant,
   `SchemaVersionError`, `detect_version` helper.
-- `agentsla/bench/upgrader.py` — `upgrade_in_place` dispatcher,
+- `agentsla/bench/upgrader.py` - `upgrade_in_place` dispatcher,
   per-version converters.
-- `tests/unit/core/test_schema_version.py` — unit tests for the
+- `tests/unit/core/test_schema_version.py` - unit tests for the
   constant + helper + dispatcher.
-- `docs/comparative-analysis.md` — AgentSLA's "offline / hermetic
+- `docs/comparative-analysis.md` - AgentSLA's "offline / hermetic
   replay" row ties to the versioning story: replay needs the schema
   version to be pinned before the trace stream is read.
