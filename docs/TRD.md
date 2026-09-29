@@ -1,4 +1,4 @@
-# AgentSLA — Technical Requirements Document (v0.1 hardening)
+# AgentSLA - Technical Requirements Document (v0.1 hardening)
 
 **For:** implementing engineers (human + AI)
 **Date:** 2026-07-09
@@ -97,12 +97,12 @@ Policy(
 
 **Egress pack (default, ordered):**
 
-- `pan` — `\b(?:\d[ -]?){13,19}\b` + Luhn
-- `ssn` — `\b\d{3}-\d{2}-\d{4}\b`
-- `aws_access_key` — `\bAKIA[0-9A-Z]{16}\b`
-- `jwt` — `\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b`
+- `pan` - `\b(?:\d[ -]?){13,19}\b` + Luhn
+- `ssn` - `\b\d{3}-\d{2}-\d{4}\b`
+- `aws_access_key` - `\bAKIA[0-9A-Z]{16}\b`
+- `jwt` - `\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b`
 
-**Invariant:** policies are **frozen** at load time (`extra="forbid", frozen=True` on Pydantic). Runtime mutation raises. Tenant extension is via `egress_rules` list only — operators cannot redefine the pack mid-run.
+**Invariant:** policies are **frozen** at load time (`extra="forbid", frozen=True` on Pydantic). Runtime mutation raises. Tenant extension is via `egress_rules` list only - operators cannot redefine the pack mid-run.
 
 ---
 
@@ -126,7 +126,7 @@ BudgetSpec(
 | `MINIMAL` | ≥75% | Drop optional sub-tasks |
 | `EMERGENCY` | ≥90% | Return best-effort answer |
 
-`BudgetExceededError` carries `(metric, observed, ceiling, level)` for caller-side mapping. The gate does **not** crash the loop — caller decides whether to fall through to the next level.
+`BudgetExceededError` carries `(metric, observed, ceiling, level)` for caller-side mapping. The gate does **not** crash the loop - caller decides whether to fall through to the next level.
 
 ---
 
@@ -256,7 +256,7 @@ text                str     (final answer, for debugging)
 
 ---
 
-## 2. P0 fixes — schema unification
+## 2. P0 fixes - schema unification
 
 ### 2.1 Problem
 
@@ -282,7 +282,7 @@ class ClaimVerdict:
     confidence: float
 ```
 
-`agentsla/verify/gate.py` does the manual mapping — but is never called by the bench. So:
+`agentsla/verify/gate.py` does the manual mapping - but is never called by the bench. So:
 - This was the pre-v0.2 failure mode. It is closed in the shipped code: wrapped bench runs now persist `Verdict` events.
 - Replay still does not re-run the verifier or adapter loop; it validates the stored trace structurally.
 
@@ -291,7 +291,7 @@ class ClaimVerdict:
 **Step 1.** Make `verify/base.py:ClaimVerdict` and `events.py:ClaimVerdict` coexist without name collision. Two options:
 
 - **Option A (chosen):** Rename the dataclass to `InternalClaimVerdict`; keep `events.py:ClaimVerdict` as the canonical event shape. The `VerificationGate` maps internal→event when emitting to the trace store.
-- **Option B:** Collapse to one pydantic model. Higher churn — every verifier signature changes.
+- **Option B:** Collapse to one pydantic model. Higher churn - every verifier signature changes.
 
 **Step 2.** Wire `VerificationGate.run` into `bench/harness.py:WrappedHooks.on_final_answer`. The gate emits a `Verdict` event to the `TraceWriter`. Shipped.
 
@@ -332,7 +332,7 @@ def test_bench_writes_verdict_event_to_trace_store(tmp_path):
 
 ---
 
-## 3. P1 fixes — CI integration gate + honest metrics
+## 3. P1 fixes - CI integration gate + honest metrics
 
 ### 3.1 CI integration gate
 
@@ -363,16 +363,16 @@ Insert a mermaid diagram after the "What problem are we solving" section. Refere
 
 Each unit: write failing test → run → confirm red → implement minimum → confirm green → refactor → commit atomically.
 
-1. **Unit 1: InternalClaimVerdict rename** — rename `verify/base.py:ClaimVerdict` to `InternalClaimVerdict`. Update all imports. (4 files touched.)
-2. **Unit 2: VerificationGate signature fix** — change `run(trace_id, final_answer)` → `run(trace, final_answer)`. (3 files touched.)
-3. **Unit 3: Bench writes Verdict event** — add `_emit_verdict()` helper, wire into `WrappedHooks.on_final_answer`. (2 files touched.)
-4. **Unit 4: `gate_passed` metric rename** — update report.py, README, WRITEUP. (4 files touched.)
-5. **Unit 5: CI integration gate** — create `.github/workflows/test.yml`. (1 file created.)
-6. **Unit 6: Comparative analysis doc** — `docs/comparative-analysis.md`. (1 file created.)
-7. **Unit 7: WRITEUP architecture diagram** — mermaid block. (1 file edited.)
-8. **Unit 8: Reframe reasoning_error trigger** — anchor-aware contradiction check. (2 files touched.)
-9. **Unit 9: Reframe tool_response_misuse trigger** — distinguish adapt vs reuse. (2 files touched.)
-10. **Unit 10: mypy unused-section cleanup** — remove unused overrides. (1 file edited.)
+1. **Unit 1: InternalClaimVerdict rename** - rename `verify/base.py:ClaimVerdict` to `InternalClaimVerdict`. Update all imports. (4 files touched.)
+2. **Unit 2: VerificationGate signature fix** - change `run(trace_id, final_answer)` → `run(trace, final_answer)`. (3 files touched.)
+3. **Unit 3: Bench writes Verdict event** - add `_emit_verdict()` helper, wire into `WrappedHooks.on_final_answer`. (2 files touched.)
+4. **Unit 4: `gate_passed` metric rename** - update report.py, README, WRITEUP. (4 files touched.)
+5. **Unit 5: CI integration gate** - create `.github/workflows/test.yml`. (1 file created.)
+6. **Unit 6: Comparative analysis doc** - `docs/comparative-analysis.md`. (1 file created.)
+7. **Unit 7: WRITEUP architecture diagram** - mermaid block. (1 file edited.)
+8. **Unit 8: Reframe reasoning_error trigger** - anchor-aware contradiction check. (2 files touched.)
+9. **Unit 9: Reframe tool_response_misuse trigger** - distinguish adapt vs reuse. (2 files touched.)
+10. **Unit 10: mypy unused-section cleanup** - remove unused overrides. (1 file edited.)
 
 Total: ~20 file edits, 9 atomic commits.
 
