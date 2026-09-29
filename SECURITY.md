@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Email: **rajath@example.invalid** (placeholder — replace before public launch).
+Email: **rajath@example.invalid** (placeholder - replace before public launch).
 
 If the report is sensitive (key extraction, prompt-injection bypass,
 policy-gate evasion), please **do not** open a public GitHub issue.
