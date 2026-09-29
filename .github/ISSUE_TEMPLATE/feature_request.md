@@ -30,4 +30,4 @@ or workflow, describe that context. -->
 
 ## Out of scope
 
-<!-- What this feature should NOT do — to prevent scope creep. -->
+<!-- What this feature should NOT do - to prevent scope creep. -->
