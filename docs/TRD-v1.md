@@ -1,8 +1,8 @@
-# AgentSLA — Technical Requirements Document (v1 — FINAL)
+# AgentSLA - Technical Requirements Document (v1 - FINAL)
 
 **For:** implementing engineer (red/green TDD, no shortcuts)
 **Reads-after:** `docs/PRD-v1.md`
-**Supersedes:** `docs/TRD.md` (v0.1 hardening — closed)
+**Supersedes:** `docs/TRD.md` (v0.1 hardening - closed)
 
 ---
 
@@ -92,7 +92,7 @@ def test_claude_sdk_routes_on_tool_call_through_policy_gate():
     → tool fn never invoked → on_final_answer still called with degraded answer."""
 ```
 
-### 1.2 Numeric verifier — per-verifier tolerance (v1 NEW)
+### 1.2 Numeric verifier - per-verifier tolerance (v1 NEW)
 
 ```python
 class NumericVerifier:
@@ -118,7 +118,7 @@ def test_numeric_verifier_default_tolerance_is_strict():
     """Default tolerance is 1e-6, NOT 1e-2 (regression guard for finops accuracy)."""
 ```
 
-### 1.3 Claim extraction — range with per-endpoint multiplier (v1 FIX)
+### 1.3 Claim extraction - range with per-endpoint multiplier (v1 FIX)
 
 ```python
 # verify/claims.py
@@ -272,7 +272,7 @@ print(final.text)
 
 ---
 
-## 2. Failure modes — quality pass (v1 NEW)
+## 2. Failure modes - quality pass (v1 NEW)
 
 `docs/failure-modes.md` ≥10 modes. Each mode has the 5-field schema:
 
@@ -287,19 +287,19 @@ print(final.text)
 Modes (target ≥10):
 
 1. DuckDB single-writer lock at p99.9 (mitigated by `--seeds N` cap)
-2. TraceWriter 50 MiB Parquet rotation (partial — buffered flush)
-3. Replay model-version drift (mitigated — `model_id` REQUIRED)
-4. Policy change between record & replay (mitigated — policy frozen)
-5. LLM judge overload / quota (partial — async queue v2)
-6. Context window explosion in classifier prompt (partial — threshold cutoff)
-7. Hermetic EchoModel self-certifies (partial — v1 adds real-LLM bench)
-8. Classifier eval circularity (partial — v1 adds real held-out fixture)
-9. Regex false positives on EOL/whitespace edge cases (mitigated — `_RANGE_PATTERN` hardening)
-10. Per-verifier tolerance mismatch (mitigated — v1 per-instance config)
-11. Range claims with per-endpoint multiplier (mitigated — v1 regex fix)
-12. Prometheus default registry collision across WrappedHooks (mitigated — module-level singleton)
-13. /metrics HTTP endpoint opt-in only (KNOWN LIMIT — operationally fine)
-14. Live Claude API bench requires `ANTHROPIC_API_KEY` (KNOWN LIMIT — harness path real, live numbers not in CI)
+2. TraceWriter 50 MiB Parquet rotation (partial - buffered flush)
+3. Replay model-version drift (mitigated - `model_id` REQUIRED)
+4. Policy change between record & replay (mitigated - policy frozen)
+5. LLM judge overload / quota (partial - async queue v2)
+6. Context window explosion in classifier prompt (partial - threshold cutoff)
+7. Hermetic EchoModel self-certifies (partial - v1 adds real-LLM bench)
+8. Classifier eval circularity (partial - v1 adds real held-out fixture)
+9. Regex false positives on EOL/whitespace edge cases (mitigated - `_RANGE_PATTERN` hardening)
+10. Per-verifier tolerance mismatch (mitigated - v1 per-instance config)
+11. Range claims with per-endpoint multiplier (mitigated - v1 regex fix)
+12. Prometheus default registry collision across WrappedHooks (mitigated - module-level singleton)
+13. /metrics HTTP endpoint opt-in only (KNOWN LIMIT - operationally fine)
+14. Live Claude API bench requires `ANTHROPIC_API_KEY` (KNOWN LIMIT - harness path real, live numbers not in CI)
 
 ---
 
@@ -340,16 +340,16 @@ Each commit lands with: failing test first → minimal implementation → green 
 
 ## 5. Anti-patterns explicitly forbidden
 
-- ❌ Wrapping someone else's framework instead of building the control plane (already avoided — we own the gates).
+- ❌ Wrapping someone else's framework instead of building the control plane (already avoided - we own the gates).
 - ❌ LLM judge on every trace (cost unbounded; ≤20% target).
 - ❌ Mutable trace state (breaks replay).
 - ❌ Fabricating benchmark numbers to make the headline look better.
 - ❌ Silent failures (any error in the gate must surface as a `Verdict.verified=False`, never swallowed).
-- ❌ Deferring work to "v2" — v1 is FINAL; everything ships or honest gap.
+- ❌ Deferring work to "v2" - v1 is FINAL; everything ships or honest gap.
 
 ---
 
-## 6. Verification — how we know we're done
+## 6. Verification - how we know we're done
 
 ```bash
 make test                        # ≥420 tests, all green
