@@ -1,8 +1,8 @@
-# AgentSLA — Product Requirements Document (v2)
+# AgentSLA - Product Requirements Document (v2)
 *Hiring-signal-grade PRD for Anthropic Staff+ Tier-1 candidacy. Drives from the
 five signals in `Staff_Level_Projects_Spec_July2026.md` Part 0.*
 
-**Status:** v2 — synthesizes post-v0.1 audit + working-tree changes.
+**Status:** v2 - synthesizes post-v0.1 audit + working-tree changes.
 **Audience:** Anthropic staff interviewers, hiring managers, open-source users.
 **Cut date:** 2026-07-13.
 
@@ -13,12 +13,12 @@ five signals in `Staff_Level_Projects_Spec_July2026.md` Part 0.*
 > Enterprises don't lack agents; they lack agents with **SLAs**. AgentSLA is the
 > reliability runtime that wraps any tool-calling agent with **deterministic
 > replay**, **policy enforcement**, **post-generation verification**, and a
-> **failure taxonomy** — so the same agent that demos in eval becomes the agent
+> **failure taxonomy** - so the same agent that demos in eval becomes the agent
 > that ships to production without losing a quarter to P0 incidents.
 
 ### 1.1 Thesis (interview one-liner)
-AgentSLA turns the FISION/Cassandra Sentinel learnings — *every agent fails;
-the question is whether you caught it and how* — into a portable open-source
+AgentSLA turns the FISION/Cassandra Sentinel learnings - *every agent fails;
+the question is whether you caught it and how* - into a portable open-source
 runtime, with the same replay + verification + taxonomy ideas applied to
 **tool-calling LLM agents** as production observability applied to services.
 
@@ -30,11 +30,11 @@ runtime, with the same replay + verification + taxonomy ideas applied to
 
 ---
 
-## 2. The five hiring signals — per-signal PRD
+## 2. The five hiring signals - per-signal PRD
 
 Each signal gets its own acceptance test, traceable to a code path, an artifact, or a documented honest gap.
 
-### Signal 1 — **Scale with SLOs, not just scale**
+### Signal 1 - **Scale with SLOs, not just scale**
 
 | Sub-requirement | Acceptance | Source of truth |
 |---|---|---|
@@ -43,25 +43,25 @@ Each signal gets its own acceptance test, traceable to a code path, an artifact,
 | **Live measured numbers** for at least one real API | `real_llm.parquet` exists with model_id + rows | `bench/real_llm.py:run_real_llm_bench` |
 | SLO attainment stated explicitly (e.g. "at p95<800ms") | README "Results" section names a p95 budget | README |
 
-### Signal 2 — **Tradeoff narratives**
+### Signal 2 - **Tradeoff narratives**
 
 | Sub-requirement | Acceptance | Source of truth |
 |---|---|---|
 | One "we tried X, failed because Y" per phase in WRITEUP.md | WRITEUP has ≥4 tradeoff paragraphs | `WRITEUP.md` |
 | Quantified frontier: latency vs gate-strictness | `seeded_errors.parquet` exists + REPORT section shows sensitivity vs tolerance | `bench/seeded_errors.py` |
 | Honest-gap callout on every unverifiable metric | `> **Honest gap —** ...` banner appears when `verified_at_truth` is `None` | `bench/report.py:_render_honest_gap_banner` |
-| Documented "when does NOT pay" — chunked-prefill-equivalent analysis | WRITEUP "Limits" section names ≥2 architectural break-points | `WRITEUP.md` |
+| Documented "when does NOT pay" - chunked-prefill-equivalent analysis | WRITEUP "Limits" section names ≥2 architectural break-points | `WRITEUP.md` |
 
-### Signal 3 — **Control-plane ownership**
+### Signal 3 - **Control-plane ownership**
 
 | Sub-requirement | Acceptance | Source of truth |
 |---|---|---|
 | Policy engine is a first-class component (not a wrapper) | `PolicyGate` is its own module with audit trail | `agentsla/policy/gate.py` |
-| Router for adapters — choose RawLoop vs LangGraph vs Claude SDK | `AgentAdapter` ABC + 3 implementations + parity bench | `agentsla/adapters/`, `bench/parity.py` |
-| Replay orchestrator — strict vs tolerant modes | `replay(trace_id, mode)` returns `ReplayReport` | `agentsla/core/replay.py` |
+| Router for adapters - choose RawLoop vs LangGraph vs Claude SDK | `AgentAdapter` ABC + 3 implementations + parity bench | `agentsla/adapters/`, `bench/parity.py` |
+| Replay orchestrator - strict vs tolerant modes | `replay(trace_id, mode)` returns `ReplayReport` | `agentsla/core/replay.py` |
 | Budget manager with degradation hooks | `BudgetManager` consumed in all three adapters | `agentsla/core/budget.py` |
 
-### Signal 4 — **Failure-mode literacy**
+### Signal 4 - **Failure-mode literacy**
 
 | Sub-requirement | Acceptance | Source of truth |
 |---|---|---|
@@ -71,7 +71,7 @@ Each signal gets its own acceptance test, traceable to a code path, an artifact,
 | Seeded-error experiment proves verifier catches injected errors | `seeded_errors.parquet` + REPORT section shows sensitivity ≥85% | `bench/seeded_errors.py` |
 | Classifier eval (held-out 36 traces) reports agreement | `eval_classifier.md` + "Classifier held-out evaluation" section | `bench/eval_classifier.py` |
 
-### Signal 5 — **Verifiable artifacts**
+### Signal 5 - **Verifiable artifacts**
 
 | Sub-requirement | Acceptance | Source of truth |
 |---|---|---|
@@ -95,7 +95,7 @@ Each signal gets its own acceptance test, traceable to a code path, an artifact,
 | F7 | Per-verifier tolerance config (F6+F7 of PRD-v1) | tolerance per domain | `tests/unit/verify/test_numeric_tolerance_config.py` |
 | F8 | Failure classifier + heuristic triggers | 14-cat mapping published | `tests/unit/classify/test_heuristics.py` |
 | F9 | Classifier held-out agreement ≥80% | `eval_classifier.md` reports ≥80% | `tests/integration/test_classifier_eval.py` |
-| F10 | **Bench smoke** — end-to-end CLI run produces parquet + report | smoke test exits 0 | `tests/integration/test_bench_smoke.py` |
+| F10 | **Bench smoke** - end-to-end CLI run produces parquet + report | smoke test exits 0 | `tests/integration/test_bench_smoke.py` |
 | F11 | **Live measured numbers** for at least one model | `real_llm.parquet` ≥30 rows + section in REPORT | `tests/unit/bench/test_real_llm.py` |
 | F12 | Two-stage classifier (heuristic → judge) with ≤20% judge sampling | default ratio honored | `tests/unit/classify/test_classifier.py` |
 | F13 | Range-claim extraction ("$4.2–4.5M") handled | range grammar parses | `tests/unit/verify/test_range_claim_extraction.py` |
@@ -140,7 +140,7 @@ These are the **non-negotiable** integrity rules. Violating any closes Tier-1.
 - [x] Failure-modes postmortem
 - [x] Cross-adapter parity bench with event-sequence equality
 - [x] Held-out classifier eval with agreement ≥80%
-- [x] Real-LLM bench path (CLI + tests + schema) — measured numbers in-flight
+- [x] Real-LLM bench path (CLI + tests + schema) - measured numbers in-flight
 - [x] WRITEUP ≥2K words with ≥4 tradeoff narratives
 - [x] Public MIT license
 
@@ -154,7 +154,7 @@ Status updated **2026-07-15** after live run landed `real_llm.parquet`.
 |---|---|---|
 | `real_llm.parquet` not yet populated against MiniMax-M3 | **Closed** | `bench/results/real_llm.parquet` carries 24 rows (12 tasks × 3 domains × 1 seed) measured on MiniMax-M3. REPORT § Real-LLM bench surfaces naked-vs-wrapped `Verified@truth`. Re-run: `python -m agentsla bench-real --model MiniMax-M3 --tasks-per-domain 5`. |
 | README "verifier caught X%" headline | **Closed** | README § Results table now reports `Verified at truth = 92% / 92%` for real-LLM path. Auto-regenerates from parquet via `agentsla report`. |
-| Classifier judge (LLM) never exercised in live bench | **Documented limitation (intentional)** | Hermetic bench uses `StubJudge` by design — see `agentsla/classify/judge.py:StubJudge` docstring and `WRITEUP.md § Limits`. Two-stage classifier's LLM-judge branch is dead-code-tested but never hot in CI; live swap is one line in `agentsla/bench/harness.py:WrappedHooks`. |
+| Classifier judge (LLM) never exercised in live bench | **Documented limitation (intentional)** | Hermetic bench uses `StubJudge` by design - see `agentsla/classify/judge.py:StubJudge` docstring and `WRITEUP.md § Limits`. Two-stage classifier's LLM-judge branch is dead-code-tested but never hot in CI; live swap is one line in `agentsla/bench/harness.py:WrappedHooks`. |
 
 ### Honest-gap callout suppression (banner logic)
 
