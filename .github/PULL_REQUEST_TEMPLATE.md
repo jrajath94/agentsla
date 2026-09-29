@@ -33,11 +33,11 @@ $ uv run pytest -q
 ## Tradeoffs
 
 <!-- What did you choose NOT to do, and why? This is the most important
-section — reviewers learn more from honest rejection criteria than from
+section - reviewers learn more from honest rejection criteria than from
 happy-path summaries. Reference at least one rejected alternative. -->
 
-- **Rejected: <alternative A>** — <reason>.
-- **Rejected: <alternative B>** — <reason>.
+- **Rejected: <alternative A>** - <reason>.
+- **Rejected: <alternative B>** - <reason>.
 
 ## Out of scope
 
