@@ -1,4 +1,4 @@
-# AgentSLA — Product Requirements Document (v0.1 → v0.2)
+# AgentSLA - Product Requirements Document (v0.1 → v0.2)
 
 **Author:** TDD-driven red/green execution
 **For:** Anthropic Staff SWE candidacy (Tier-1 project) · Hiring signals: scale-with-SLOs · tradeoff narratives · control-plane ownership · failure-mode literacy · verifiable artifacts
@@ -10,12 +10,12 @@
 
 AgentSLA is an **SLO-aware reliability runtime** that wraps any tool-calling LLM agent (Claude SDK, LangGraph, raw loop) with **four hard guarantees**:
 
-1. **Policy enforcement** — every tool call passes a declarative YAML policy (allowed tools, JSON-Schema validation, per-tool/per-trace call caps, egress regex pack) before execution.
-2. **Post-generation verification** — every numeric claim in the final answer is recomputed against source tool results; the gate emits a `Verdict` event with `coverage` (fraction of claims checked) and `incorrect` count.
-3. **Replay** — every run is captured as an append-only event log. `agentsla replay <trace_id>` re-validates recorded tool-call hashes and returns the recorded final answer (structural, every trace); `agentsla replay <trace_id> --execute` re-drives the adapter loop with recorded tool results stubbed in and asserts a byte-identical final answer (deterministic rawloop-recorded traces; live-model traces refuse with exit 2).
-4. **Failure attribution** — every failed trace is labeled with one of 14 categories via a two-stage classifier (heuristic → LLM judge) and emitted as a Prometheus counter.
+1. **Policy enforcement** - every tool call passes a declarative YAML policy (allowed tools, JSON-Schema validation, per-tool/per-trace call caps, egress regex pack) before execution.
+2. **Post-generation verification** - every numeric claim in the final answer is recomputed against source tool results; the gate emits a `Verdict` event with `coverage` (fraction of claims checked) and `incorrect` count.
+3. **Replay** - every run is captured as an append-only event log. `agentsla replay <trace_id>` re-validates recorded tool-call hashes and returns the recorded final answer (structural, every trace); `agentsla replay <trace_id> --execute` re-drives the adapter loop with recorded tool results stubbed in and asserts a byte-identical final answer (deterministic rawloop-recorded traces; live-model traces refuse with exit 2).
+4. **Failure attribution** - every failed trace is labeled with one of 14 categories via a two-stage classifier (heuristic → LLM judge) and emitted as a Prometheus counter.
 
-It is the **reliability layer for agents** — the thing that turns "agent demoed well" into "agent runs in production with an SLA."
+It is the **reliability layer for agents** - the thing that turns "agent demoed well" into "agent runs in production with an SLA."
 
 ---
 
@@ -39,9 +39,9 @@ The five signals the Anthropic Staff rubric screens for, and how AgentSLA eviden
 
 | Signal | Evidence in this artifact |
 |---|---|
-| **Scale with SLOs** | `bench/results/REPORT.md` — p95 latency overhead, success rate, verified%, injection resistance, all per-domain. Latency frontier is measured, not assumed. |
+| **Scale with SLOs** | `bench/results/REPORT.md` - p95 latency overhead, success rate, verified%, injection resistance, all per-domain. Latency frontier is measured, not assumed. |
 | **Tradeoff narratives** | WRITEUP § "What we tried, and why we changed it" documents five concrete tradeoffs (in-process rawloop vs framework fork, append-only vs mutable trace, coverage-as-metric vs binary, heuristic-first vs LLM-first, DuckDB vs SQLite/Postgres). |
-| **Control-plane ownership** | The whole runtime IS the control plane — `PolicyGate` is the scheduler for tool calls; `VerificationChain` is the post-execution auditor; `Classifier` is the routing logic for failure attribution. Not a wrapper around someone else's components. |
+| **Control-plane ownership** | The whole runtime IS the control plane - `PolicyGate` is the scheduler for tool calls; `VerificationChain` is the post-execution auditor; `Classifier` is the routing logic for failure attribution. Not a wrapper around someone else's components. |
 | **Failure-mode literacy** | `docs/failure-modes.md` documents **6 known failure modes** (DuckDB writer lock, verifier scaling, judge availability, EchoModel bias, classifier eval circularity, regex false positives), each with **trigger**, **why-it-breaks**, **observable signal**, **v0.1 status**, **mitigation**. |
 | **Verifiable artifacts** | `make bench && make report` regenerates every number in README. The bench is hermetic, the parquet is reproducible, the COMMIT hash is in the report. One-command repro. |
 
@@ -49,12 +49,12 @@ The five signals the Anthropic Staff rubric screens for, and how AgentSLA eviden
 
 ## 3. Functional requirements
 
-### 3.1 MUST (v0.1 — already shipped, hardening remaining)
+### 3.1 MUST (v0.1 - already shipped, hardening remaining)
 
 - **F1. Trace store.** Append-only event log over DuckDB+Parquet with strict ordering by `(trace_id, seq)`. ✓ shipped.
 - **F2. Replay.** Strict + tolerant structural replay; args_hash drift detection. ✓ shipped.
 - **F3. Policy gate.** Declarative YAML → Pydantic-frozen → runtime decision. Five-step evaluation (membership → schema → per-tool counts → global count → egress). ✓ shipped.
-- **F4. Egress pack.** PAN-Luhn, SSN, AWS key, JWT — real-format defaults + tenant-extensible. ✓ shipped.
+- **F4. Egress pack.** PAN-Luhn, SSN, AWS key, JWT - real-format defaults + tenant-extensible. ✓ shipped.
 - **F5. Budget manager.** Token/cost/call/wall-time with 4-level degradation (FULL → REDUCED → MINIMAL → EMERGENCY). ✓ shipped. Wired into the runtime hook contract in v1.2 (`BudgetedHooks`): breaches convert to policy-style DENYs so the adapter degrades gracefully instead of crashing.
 - **F6. Numeric verifier.** Extract → recompute → tolerance-check → emit `Verdict` with coverage + per_claim. ✓ shipped. **Gap: schema unification.**
 - **F7. Classifier.** 14-cat taxonomy; 14 heuristic triggers; two-stage (heuristic → judge ≤20%); Prometheus counter; JSONL sink. ✓ shipped.
@@ -62,7 +62,7 @@ The five signals the Anthropic Staff rubric screens for, and how AgentSLA eviden
 - **F9. Seeded-error experiment.** 20 tasks × 5 strategies × 100 trials = 10K rows; sensitivity/specificity table. ✓ shipped.
 - **F10. CLI.** `run` / `replay` / `bench` / `bench-seeded-errors` / `report`. ✓ shipped.
 
-### 3.2 MUST (v0.1 hardening — gaps to close)
+### 3.2 MUST (v0.1 hardening - gaps to close)
 
 - **F11. Unified `ClaimVerdict` schema.** One type, one source of truth. Eliminate the pydantic-vs-dataclass drift. → P0.
 - **F12. Bench writes `Verdict` events to DuckDB.** Closed in v0.2; wrapped bench runs now persist verdict events. Adapter-loop replay closed in v1.2: `agentsla replay --execute` re-drives the loop for deterministic traces.
@@ -82,7 +82,7 @@ The five signals the Anthropic Staff rubric screens for, and how AgentSLA eviden
 
 ### 3.4 WON'T (out of scope)
 
-- Multi-agent / swarm taxonomy (MAST 14→33 — we collapse to 14 for single-agent).
+- Multi-agent / swarm taxonomy (MAST 14→33 - we collapse to 14 for single-agent).
 - Training a custom classifier on the 100 labelled traces.
 - Real-time dashboarding beyond Prometheus scrape (operator-side concern).
 
@@ -102,7 +102,7 @@ The five signals the Anthropic Staff rubric screens for, and how AgentSLA eviden
 
 ---
 
-## 5. Acceptance criteria (v0.1 hardening — Definition of Done)
+## 5. Acceptance criteria (v0.1 hardening - Definition of Done)
 
 1. ✓ `make bench && make report` regenerates a README that matches the headline table.
 2. ✓ All 332 existing tests pass + new tests for P0 fixes (target: 360+).
@@ -121,7 +121,7 @@ The five signals the Anthropic Staff rubric screens for, and how AgentSLA eviden
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Schema unification breaks 332 existing tests | High | High | Red/green TDD per change; never modify tests to match code — modify code to satisfy tests. |
+| Schema unification breaks 332 existing tests | High | High | Red/green TDD per change; never modify tests to match code - modify code to satisfy tests. |
 | Live-LLM bench costs exceed budget | Medium | Medium | Use Haiku 4.5 (cheapest), 1000 trials max. Document as `[NOT YET MEASURED]` if not run. |
 | Classifier eval stays circular | Medium | Low | Documented honestly. The 100% is a ceiling; v0.2 swaps in real traces. |
 | Bench smoke in CI is slow | Low | Medium | `--seeds 1` for CI, `--seeds 5` for local. CI gate <2min. |
