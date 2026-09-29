@@ -1,9 +1,9 @@
-# AgentSLA — Technical Requirements Document (v2)
+# AgentSLA - Technical Requirements Document (v2)
 *Companion to PRD-v2. Drives from `AgentSLA_Implementation_Brief.md` + actual
 post-v0.1 source state. Every module is described as it exists today, with
 the gaps the v2 audit must close.*
 
-**Status:** v2 — synthesizes post-v0.1 audit + working-tree changes.
+**Status:** v2 - synthesizes post-v0.1 audit + working-tree changes.
 **Audience:** implementation engineers, reviewers, future contributors.
 **Cut date:** 2026-07-13.
 
@@ -48,10 +48,10 @@ class RuntimeHooks(ABC):
 ```
 
 **Design decision (defensible):** hooks-based middleware, not framework forks.
-Proves portability — the same agent code runs against RawLoop, LangGraph, and
+Proves portability - the same agent code runs against RawLoop, LangGraph, and
 Claude Agent SDK without source changes. **Tradeoff:** cannot intercept
 sub-calls inside a single tool (e.g. a calculator tool calling `web_search`).
-We accept this — those internal calls are out of scope for the SLO contract.
+We accept this - those internal calls are out of scope for the SLO contract.
 
 ### 2.2 Event log (source of truth)
 
@@ -65,7 +65,7 @@ We accept this — those internal calls are out of scope for the SLO contract.
 
 **Append-only invariant:** events never mutate after write. Replay reads
 events in seq order, re-derives each `ToolCall.args_hash` from the recorded
-args, and returns the stored final answer. Replay is *structural* — it
+args, and returns the stored final answer. Replay is *structural* - it
 validates the recorded log; it does not re-drive the adapter.
 
 ### 2.3 Replay semantics
@@ -77,7 +77,7 @@ def replay(trace_id: UUID, *, mode: Literal["strict", "tolerant"]) -> ReplayRepo
 | Mode | Behavior | Use case |
 |---|---|---|
 | `strict` | Any `args_hash` drift on a recorded ToolCall = FAIL (`ToolCallDriftError`, exit 1) | regression test that the recorded log is replay-safe |
-| `tolerant` | Drift recorded in `ReplayReport.drift_details`; run does not fail | triage a drifted log — the diff list is the artifact |
+| `tolerant` | Drift recorded in `ReplayReport.drift_details`; run does not fail | triage a drifted log - the diff list is the artifact |
 
 **Invariant:** replay never re-executes tools or the model. It re-validates
 recorded `args_hash` values and returns the trace's stored final answer
@@ -89,55 +89,55 @@ shipped (see `agentsla/core/replay.py` module docstring).
 ## 3. Module API surface
 
 ### 3.1 `agentsla/core/`
-- `events.py` — pydantic v2 frozen models, `extra="forbid"`. Schema version stamped on every event.
-- `trace.py` — `TraceWriter` (DuckDB append + Parquet export), `TraceReader` (SQL).
-- `replay.py` — `replay()`, `ReplayReport`.
-- `budget.py` — `BudgetManager` (token/cost/latency), degradation hooks.
-- `types.py` — shared primitives (UTC-aware datetimes).
-- `schema_version.py` — schema version table + `upgrade(v_from, v_to)` scaffold.
+- `events.py` - pydantic v2 frozen models, `extra="forbid"`. Schema version stamped on every event.
+- `trace.py` - `TraceWriter` (DuckDB append + Parquet export), `TraceReader` (SQL).
+- `replay.py` - `replay()`, `ReplayReport`.
+- `budget.py` - `BudgetManager` (token/cost/latency), degradation hooks.
+- `types.py` - shared primitives (UTC-aware datetimes).
+- `schema_version.py` - schema version table + `upgrade(v_from, v_to)` scaffold.
 
 ### 3.2 `agentsla/policy/`
-- `schema.py` — `Policy` pydantic model. `allowed_tools: list[str]`, `tool_rules: list[ToolRule]`, `egress_rules: list[EgressRule]`, `max_calls_per_trace: int`, `mode: Literal["enforce","shadow"]`.
-- `gate.py` — `PolicyGate(Policy)`. Returns `GateDecision(allow: bool, reason: str | None, decision: Literal["allow","deny","rewrite"])`. Maintains `gate.audit: list[dict]` for downstream classifier.
-- `egress.py` — `EgressRule(name, regex, severity)`, `default_egress_rules()` returns the SSN/PAN/AWS-key/JWT pack.
-- `loader.py` — `load_policy(yaml_path)` parses YAML → `Policy`.
+- `schema.py` - `Policy` pydantic model. `allowed_tools: list[str]`, `tool_rules: list[ToolRule]`, `egress_rules: list[EgressRule]`, `max_calls_per_trace: int`, `mode: Literal["enforce","shadow"]`.
+- `gate.py` - `PolicyGate(Policy)`. Returns `GateDecision(allow: bool, reason: str | None, decision: Literal["allow","deny","rewrite"])`. Maintains `gate.audit: list[dict]` for downstream classifier.
+- `egress.py` - `EgressRule(name, regex, severity)`, `default_egress_rules()` returns the SSN/PAN/AWS-key/JWT pack.
+- `loader.py` - `load_policy(yaml_path)` parses YAML → `Policy`.
 
 ### 3.3 `agentsla/verify/`
-- `base.py` — `Verifier` ABC, `VerificationResult(passed, coverage, incorrect, details)`.
-- `numeric.py` — `NumericVerifier(source_resolver)`. Extracts numeric claims, recomputes from source tools, tolerance check (per-verifier config).
-- `claims.py` — claim extraction, including range grammar ("$4.2–4.5M").
-- `chain.py` — `VerificationChain(verifiers=[...])`. Runs each verifier; combines.
-- `gate.py` — `VerificationGate(chain, writer, verifier="composite")`. The bridge: chain result → `Verdict` event appended to trace store.
+- `base.py` - `Verifier` ABC, `VerificationResult(passed, coverage, incorrect, details)`.
+- `numeric.py` - `NumericVerifier(source_resolver)`. Extracts numeric claims, recomputes from source tools, tolerance check (per-verifier config).
+- `claims.py` - claim extraction, including range grammar ("$4.2–4.5M").
+- `chain.py` - `VerificationChain(verifiers=[...])`. Runs each verifier; combines.
+- `gate.py` - `VerificationGate(chain, writer, verifier="composite")`. The bridge: chain result → `Verdict` event appended to trace store.
 
 ### 3.4 `agentsla/classify/`
-- `taxonomy.py` — `FailureCategory` enum, 14 values from FISION paper.
-- `heuristics.py` — `HEURISTIC_TRIGGERS: list[HeuristicTrigger]`. Maps patterns → categories.
-- `classifier.py` — `Classifier(sink, on_classify, heuristic_context, judge=None)`. Two-stage: heuristics first, judge for residuals (≤20% sample by default).
-- `judge.py` — `Judge` ABC, `StubJudge` (deterministic, used in hermetic), `ClaudeJudge` (live, Haiku by default).
-- `metrics.py` — `build_metrics(registry=None) -> MetricsBundle(failures_total, verify_coverage, classify_latency_seconds, registry)`, `on_classify_callback(metrics)`.
+- `taxonomy.py` - `FailureCategory` enum, 14 values from FISION paper.
+- `heuristics.py` - `HEURISTIC_TRIGGERS: list[HeuristicTrigger]`. Maps patterns → categories.
+- `classifier.py` - `Classifier(sink, on_classify, heuristic_context, judge=None)`. Two-stage: heuristics first, judge for residuals (≤20% sample by default).
+- `judge.py` - `Judge` ABC, `StubJudge` (deterministic, used in hermetic), `ClaudeJudge` (live, Haiku by default).
+- `metrics.py` - `build_metrics(registry=None) -> MetricsBundle(failures_total, verify_coverage, classify_latency_seconds, registry)`, `on_classify_callback(metrics)`.
 
 ### 3.5 `agentsla/adapters/`
-- `base.py` — `AgentAdapter` ABC, `RuntimeHooks` ABC.
-- `rawloop.py` — `RawLoopAdapter(tools, trace_writer, echo_model, task_text)`. Reference implementation. **Used by hermetic bench.**
-- `langgraph.py` — `LangGraphAdapter`. Wraps a LangGraph graph; routes via hooks.
-- `claude_sdk.py` — `ClaudeSdkAdapter`. Wraps Claude Agent SDK with **injected client** (no runtime network dep for tests).
-- `noop_hooks.py` — `NoOpHooks`. Used for `naked` mode in bench.
+- `base.py` - `AgentAdapter` ABC, `RuntimeHooks` ABC.
+- `rawloop.py` - `RawLoopAdapter(tools, trace_writer, echo_model, task_text)`. Reference implementation. **Used by hermetic bench.**
+- `langgraph.py` - `LangGraphAdapter`. Wraps a LangGraph graph; routes via hooks.
+- `claude_sdk.py` - `ClaudeSdkAdapter`. Wraps Claude Agent SDK with **injected client** (no runtime network dep for tests).
+- `noop_hooks.py` - `NoOpHooks`. Used for `naked` mode in bench.
 
 ### 3.6 `agentsla/bench/`
-- `harness.py` — `agentsla bench` CLI. `{naked, wrapped} × tasks × seeds → results.parquet`. `--metrics-port` for live Prometheus.
-- `tasks.py` — 30 tasks: `financial_ops/`, `incident_triage/`, `doc_qa/`. Substring `expected_substring`, optional `injection`, optional `ground_truth`, optional `holdout`.
-- `parity.py` — `agentsla bench-parity`. Cross-adapter event-sequence parity.
-- `seeded_errors.py` — `agentsla bench-seeded-errors`. Mutation strategies (±10%, ±20%) × trials → sensitivity/specificity.
-- `real_llm.py` — `agentsla bench-real`. Live API. Both naked + wrapped modes. Gated `naked`: no gate. Wrapped: route response through `PolicyGate` via synthetic `ToolCall("response_text", text)`.
-- `eval_classifier.py` — `agentsla eval-classifier`. Held-out traces vs hand-labeled gold.
-- `figures.py` — `agentsla bench-figures`. Matplotlib PNGs for README.
-- `report.py` — `agentsla report`. Reads parquet(s) → markdown.
-- `upgrader.py` — schema-version upgrade tool.
+- `harness.py` - `agentsla bench` CLI. `{naked, wrapped} × tasks × seeds → results.parquet`. `--metrics-port` for live Prometheus.
+- `tasks.py` - 30 tasks: `financial_ops/`, `incident_triage/`, `doc_qa/`. Substring `expected_substring`, optional `injection`, optional `ground_truth`, optional `holdout`.
+- `parity.py` - `agentsla bench-parity`. Cross-adapter event-sequence parity.
+- `seeded_errors.py` - `agentsla bench-seeded-errors`. Mutation strategies (±10%, ±20%) × trials → sensitivity/specificity.
+- `real_llm.py` - `agentsla bench-real`. Live API. Both naked + wrapped modes. Gated `naked`: no gate. Wrapped: route response through `PolicyGate` via synthetic `ToolCall("response_text", text)`.
+- `eval_classifier.py` - `agentsla eval-classifier`. Held-out traces vs hand-labeled gold.
+- `figures.py` - `agentsla bench-figures`. Matplotlib PNGs for README.
+- `report.py` - `agentsla report`. Reads parquet(s) → markdown.
+- `upgrader.py` - schema-version upgrade tool.
 
 ### 3.7 `agentsla/cli/`
-- `run.py` — `agentsla run` (single trace).
-- `replay.py` — `agentsla replay <trace_id> [--strict|--tolerant]`.
-- `__main__.py` — subcommand dispatcher.
+- `run.py` - `agentsla run` (single trace).
+- `replay.py` - `agentsla replay <trace_id> [--strict|--tolerant]`.
+- `__main__.py` - subcommand dispatcher.
 
 ---
 
