@@ -1,4 +1,4 @@
-# AgentSLA — Comparative Analysis
+# AgentSLA - Comparative Analysis
 
 A side-by-side framing of AgentSLA against the four most-adopted
 commercial / open-source LLM-observability stacks as of 2026-07. The
@@ -7,7 +7,7 @@ incumbents (observability, traces), where it diverges (structural
 replay, SLO-grade verification), and where it does not try to compete
 (realtime dashboards, hosted SaaS, eval-marketplace).
 
-Scope of comparison: the **runtime guarantees** AgentSLA ships — the
+Scope of comparison: the **runtime guarantees** AgentSLA ships - the
 four guarantees named in `WRITEUP.md § Headline`:
 
 1. Verification gate (numeric claim recomputation today).
@@ -20,20 +20,20 @@ four guarantees named in `WRITEUP.md § Headline`:
 | Capability | AgentSLA | LangSmith | Langfuse | Helicone | Braintrust |
 |---|:--:|:--:|:--:|:--:|:--:|
 | **Append-only trace log** | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **Hosted SaaS** | — | ✓ | ✓ | ✓ | ✓ |
-| **Structural replay** | ✓ (strict + tolerant) | — | — | — | — |
-| **Post-execution verification gate** | ✓ (numeric claim recomputation today) | partial (eval chains) | partial (eval chains) | — | ✓ (scorers) |
-| **Tool-call policy gate (egress regex)** | ✓ | — | — | — | — |
+| **Hosted SaaS** | - | ✓ | ✓ | ✓ | ✓ |
+| **Structural replay** | ✓ (strict + tolerant) | - | - | - | - |
+| **Post-execution verification gate** | ✓ (numeric claim recomputation today) | partial (eval chains) | partial (eval chains) | - | ✓ (scorers) |
+| **Tool-call policy gate (egress regex)** | ✓ | - | - | - | - |
 | **Token / cost budget enforcement** | ✓ | partial (cost tracking) | partial (cost tracking) | ✓ (cost-only) | partial |
-| **Wall-clock deadline enforcement** | ✓ | — | — | — | — |
-| **Failure taxonomy (machine-readable)** | ✓ (14 categories) | partial (custom tags) | partial (custom tags) | — | partial (custom scorers) |
-| **Two-stage classifier (heuristic + LLM judge)** | ✓ | — | — | — | ✓ |
-| **Offline / hermetic structural replay of captured traces** | ✓ | — | — | — | — |
-| **Local-first (no cloud required)** | ✓ | — | ✓ (self-host) | — | — |
+| **Wall-clock deadline enforcement** | ✓ | - | - | - | - |
+| **Failure taxonomy (machine-readable)** | ✓ (14 categories) | partial (custom tags) | partial (custom tags) | - | partial (custom scorers) |
+| **Two-stage classifier (heuristic + LLM judge)** | ✓ | - | - | - | ✓ |
+| **Offline / hermetic structural replay of captured traces** | ✓ | - | - | - | - |
+| **Local-first (no cloud required)** | ✓ | - | ✓ (self-host) | - | - |
 | **Open-source under MIT** | ✓ | partial (closed SaaS) | ✓ (MIT) | partial (AGPL-3) | partial |
 
 Legend: ✓ = first-class support; partial = present but not the
-primary use case; — = absent.
+primary use case; - = absent.
 
 ## Where AgentSLA overlaps (and why that is fine)
 
@@ -42,16 +42,16 @@ here).** AgentSLA emits a typed `Trace` with `ToolCall`, `ToolResult`,
 `ModelMessage`, and `Verdict` events; the trace store is DuckDB with
 Parquet export. This is the same shape everyone else ships. We do not
 try to beat the incumbents on realtime dashboards, alerting, or hosted
-multi-tenant UX — that is not the thesis.
+multi-tenant UX - that is not the thesis.
 
 **Two-stage classification (Braintrust overlap).** Braintrust's
 scorers and AgentSLA's `Classifier` share a common shape: heuristic
 triggers fast-path the easy cases, an LLM judge covers the long tail.
 AgentSLA's contribution is the **deterministic 14-category failure
-taxonomy** that the heuristic stage emits — Braintrust leaves the
+taxonomy** that the heuristic stage emits - Braintrust leaves the
 taxonomy to the user.
 
-## Where AgentSLA diverges — the three guarantees
+## Where AgentSLA diverges - the three guarantees
 
 ### 1. Structural replay (no incumbent ships this)
 
@@ -60,9 +60,9 @@ The `TraceReader.iter_events(trace_id)` path + canonical-JSON
 recomputing each recorded tool-call hash, surfacing drift, and
 returning the stored final answer. The two modes:
 
-* **Strict** — every `ToolCall.args_hash` must match exactly. Any
+* **Strict** - every `ToolCall.args_hash` must match exactly. Any
   drift raises a replay error and aborts.
-* **Tolerant** — drift is recorded but the replay continues so the
+* **Tolerant** - drift is recorded but the replay continues so the
   report can be used for triage.
 
 Adapter-driven re-execution with stubbed tool results ships as
@@ -70,13 +70,13 @@ Adapter-driven re-execution with stubbed tool results ships as
 traces; live-model traces refuse it and fall back to structural replay.
 
 LangSmith/Langfuse ship "replay" as "re-run this trace in the UI to
-re-observe the same calls" — that is a debugging affordance, not a
+re-observe the same calls" - that is a debugging affordance, not a
 verification primitive. Helicone and Braintrust ship observability
 but no replay primitive at all.
 
 ### 2. Post-execution verification gate (not the same as eval chains)
 
-LangSmith and Langfuse both have "evaluators" / "evals" — but those
+LangSmith and Langfuse both have "evaluators" / "evals" - but those
 are typically **upstream** LLM-as-judge pipelines that score model
 output before it reaches the user. AgentSLA's `VerificationGate` runs
 **after** the agent finishes, **recomputes** numeric claims against
@@ -106,7 +106,7 @@ evals, not policy.
 ## What AgentSLA does NOT do (honest gaps)
 
 * **No hosted SaaS.** Single-tenant, runs in your process. This is
-  deliberate — the trace store contains tool-call arguments which
+  deliberate - the trace store contains tool-call arguments which
   may carry PII; shipping them to a third-party SaaS would defeat
   the threat model.
 * **No realtime alerting.** Prometheus counters are emitted but
@@ -122,7 +122,7 @@ evals, not policy.
   not the upstream prompt. Optimization would need a separate
   project.
 
-## Decision rubric — when to use what
+## Decision rubric - when to use what
 
 | If you need… | Use |
 |---|---|
