@@ -1,4 +1,4 @@
-# Failure modes — what breaks at p99.9
+# Failure modes - what breaks at p99.9
 
 AgentSLA v0.1 is single-process, hermetic, and bench-validated at
 ~350-row scale. It is not load-tested. This document enumerates the
@@ -75,7 +75,7 @@ judge-call phase.
 
 **v0.1 status**: The shipped classifier falls back to the highest-
 severity heuristic candidate when the judge raises. This is a
-degraded-but-functional state — the classifier does not block on
+degraded-but-functional state - the classifier does not block on
 judge availability.
 
 **Mitigation**: Set an alert on
@@ -118,7 +118,7 @@ held-out set and inferring the classifier is production-ready.
 
 **Why it breaks**: The held-out set is constructed from the same
 triggers the classifier uses. The agreement metric is at the ceiling
-of what it can express — there is no signal above 100%.
+of what it can express - there is no signal above 100%.
 
 **Observable signal**: The classifier appears to score perfectly on
 the bench eval. It would also score perfectly on its own training
@@ -127,8 +127,8 @@ data; the metric does not distinguish.
 **v0.1 status**: Documented in `WRITEUP.md § "Where we fell short"`.
 
 **Mitigation**: Replace the synthetic eval set with traces recorded
-from live Claude API calls (the recording path —
-`TraceWriter` — is the same; the harness just needs a real client).
+from live Claude API calls (the recording path -
+`TraceWriter` - is the same; the harness just needs a real client).
 v0.2 work; not in v0.1.
 
 ---
@@ -136,7 +136,7 @@ v0.2 work; not in v0.1.
 ## 6. Egress regex false positives
 
 **Trigger**: A task whose legitimate arguments contain a string that
-trivially matches the default egress pack — for example, a base64-
+trivially matches the default egress pack - for example, a base64-
 encoded JWT in a test fixture, or a literal hex string that the regex
 mistakes for a card PAN.
 
@@ -162,13 +162,13 @@ and ships in the same commit as this document lands.
 
 - Adversarial inputs the verifier cannot parse (claimed text with
   emoji, RTL marks, zero-width joiners): not measured.
-- Replay drift across agent versions: not measured — replay is
+- Replay drift across agent versions: not measured - replay is
   byte-identical because the bench is hermetic.
 - Tenant isolation / multi-tenancy: v0.2 work (per ROADMAP).
 
 ---
 
-# v1 additions — what we learned shipping the third adapter
+# v1 additions - what we learned shipping the third adapter
 
 The v1 push landed the ClaudeSdkAdapter, the real-LLM bench harness,
 the per-endpoint range-claim parser, and the per-verifier tolerance
@@ -208,7 +208,7 @@ with an accompanying parity test update.
 
 **Trigger**: A real P&L trace contains `$4.2M-$4.5M` (per-endpoint
 multiplier). v0.1's `_RANGE_PATTERN` matched the span but silently
-dropped the second endpoint's `M`, parsing it as `(4.2, 4.5)` —
+dropped the second endpoint's `M`, parsing it as `(4.2, 4.5)` -
 inflating unverifiable coverage because no tool result ever matches
 4.5 raw dollars.
 
@@ -239,11 +239,11 @@ the parsed `(low, high)` matches the expected.
 
 **Trigger**: The real-LLM bench (`python -m agentsla bench-real`) hits
 Claude's rate limit mid-run. v0.1 had no real-LLM bench; v1 added one
-(the ground-truthable corpus is 12 tasks — 4 per domain — so the
+(the ground-truthable corpus is 12 tasks - 4 per domain - so the
 largest single-seed run is 12 prompts / 24 rows).
 
 **Why it breaks**: Without graceful degradation, a rate-limit error
-aborts the run and writes zero rows — and naive retries burn more paid
+aborts the run and writes zero rows - and naive retries burn more paid
 calls against an already-limited key.
 
 **Current status**: Mitigated twice over. Every `_call_claude`
@@ -301,7 +301,7 @@ different `tolerance` values, and one verifier's float-rounding
 artifact falls inside its tolerance but outside another's.
 
 **Why it breaks**: The chain's pass criterion is
-`incorrect == 0 AND coverage >= threshold` — the same criterion for
+`incorrect == 0 AND coverage >= threshold` - the same criterion for
 every verifier. But the per-verifier `tolerance` controls whether a
 claim is `correct` or `incorrect`. A chain mixing `1e-6` and `1e-3`
 verifiers can report `incorrect > 0` on a claim one verifier would
@@ -310,7 +310,7 @@ have passed.
 **v1 status**: Documented. Per-verifier tolerance is now a public
 API surface (`NumericVerifier(tolerance=...)`) with a regression
 test in `tests/unit/verify/test_numeric_tolerance_config.py`. The
-chain does NOT enforce uniform tolerance — operators choose per
+chain does NOT enforce uniform tolerance - operators choose per
 domain (financial ops at 1e-9, doc-QA at 1e-3).
 
 **Mitigation**: Add a `VerificationChain(consensus_tolerance=...)`
